@@ -96,9 +96,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    # Also allow any localhost / 127.0.0.1 port. The Vite dev server falls back off
+    # 5173 to 5174+ whenever 5173 is busy, which silently changes the browser's
+    # Origin and is the usual cause of a "No Access-Control-Allow-Origin" preflight
+    # failure in local dev. Production origins stay explicit in CORS_ORIGINS above.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"],  # wildcard already reflects X-API-Key on the preflight
 )
 # Extracted clips are served here so the frontend can play them directly.
 # URL shape: /clips/<job_id>/<clip_filename>.mp4
