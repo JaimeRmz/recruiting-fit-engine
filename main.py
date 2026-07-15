@@ -37,10 +37,14 @@ VALID_GENDERS = {"M", "W"}
 VALID_CLASS_YEARS = {"Fr", "So", "Jr", "Sr"}
 
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024        # 500 MB
-# 15-minute cap for the DEPLOYED environment (tightened from 30 locally): Render
-# compute is unproven against the locally-validated ~1 min processing per ~8 min
-# of footage, so cap the worst-case synchronous wait at ~2 minutes until measured.
-MAX_DURATION_SEC = 15 * 60                  # 15 minutes
+# 3-minute cap for the DEPLOYED environment. Measured on Render Starter (shared
+# CPU): ~1 min of processing per ~1.8 min of footage, about 4.7x slower than local.
+# At 3 min of footage that is ~1.7 min of synchronous CPU work, holding the wait
+# under a ~2 min ceiling with headroom for shared-CPU variability. (Locally the
+# pipeline is ~4.5x faster, so this cap is conservative there -- fine.) If this
+# endpoint ever needs to accept full halves, move it to a background job instead
+# of raising the cap.
+MAX_DURATION_SEC = 3 * 60                   # 3 minutes
 UPLOAD_CHUNK = 1024 * 1024                  # 1 MB streaming chunks
 CLIP_TTL_SEC = 60 * 60                      # serve extracted clips for 1 hour
 
@@ -152,11 +156,11 @@ class MomentsResponse(BaseModel):
     """
     Candidate highlight moments for human review.
 
-    SYNCHRONOUS endpoint: it blocks until analysis finishes. Processing runs at
-    roughly 1 minute per 8 minutes of footage, so a 15-minute upload (the cap)
-    takes on the order of 2 minutes. Set your client timeout accordingly. No
-    background-job polling is provided by design -- the 15-minute upload cap keeps
-    the wait short enough that it is not needed.
+    SYNCHRONOUS endpoint: it blocks until analysis finishes. On Render's shared
+    CPU, processing runs at ~1 minute per ~1.8 minutes of footage, so a 3-minute
+    upload (the cap) is ~1.7 minutes of CPU work, plus upload time. Set your client
+    timeout to allow several minutes. No background-job polling is provided by
+    design -- the 3-minute footage cap keeps the synchronous wait bounded.
     """
     total_candidates: int
     video_duration_sec: float
@@ -256,9 +260,10 @@ def moments(file: UploadFile = File(...), _auth: None = Depends(require_api_key)
     Find CANDIDATE highlight timestamps in an uploaded match video.
 
     Requires a valid X-API-Key header (shared secret). Uploads are scoped to a
-    single half or segment: max 15 minutes / 500 MB. This is the product's
-    intended usage, not a technical limit -- trim to the relevant segment before
-    uploading. Synchronous; expect ~1 min of processing per ~8 min of footage.
+    single passage: max 3 minutes / 500 MB. This is the product's intended usage,
+    not a technical limit -- trim to the relevant segment before uploading.
+    Synchronous; on Render's shared CPU expect ~1 min of processing per ~1.8 min
+    of footage.
     """
     _sweep_expired_clips()
 
