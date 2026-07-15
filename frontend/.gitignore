@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+
+# Local env files — the real API key lives here and must never be committed.
+.env
+.env.local
+.env.*.local
+*.local
+
+.DS_Store
+*.log
