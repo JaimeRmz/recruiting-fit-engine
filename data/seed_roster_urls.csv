@@ -1,0 +1,76 @@
+school,division,gender,url,template
+Stanford,D1,M,https://gostanford.com/sports/mens-soccer/roster,wmt
+Stanford,D1,W,https://gostanford.com/sports/womens-soccer/roster,wmt
+Indiana,D1,M,https://iuhoosiers.com/sports/mens-soccer/roster,sidearm
+Indiana,D1,W,https://iuhoosiers.com/sports/womens-soccer/roster,sidearm
+Georgetown,D1,M,https://guhoyas.com/sports/mens-soccer/roster,sidearm
+Georgetown,D1,W,https://guhoyas.com/sports/womens-soccer/roster,sidearm
+Wake Forest,D1,M,https://godeacs.com/sports/mens-soccer/roster,sidearm
+Wake Forest,D1,W,https://godeacs.com/sports/womens-soccer/roster,sidearm
+Maryland,D1,M,https://umterps.com/sports/mens-soccer/roster,sidearm
+Maryland,D1,W,https://umterps.com/sports/womens-soccer/roster,sidearm
+Creighton,D1,M,https://gocreighton.com/sports/mens-soccer/roster,sidearm
+Syracuse,D1,M,https://cuse.com/sports/mens-soccer/roster,sidearm
+Washington,D1,M,https://gohuskies.com/sports/mens-soccer/roster,sidearm
+Washington,D1,W,https://gohuskies.com/sports/womens-soccer/roster,sidearm
+Denver,D1,M,https://denverpioneers.com/sports/mens-soccer/roster,sidearm
+Denver,D1,W,https://denverpioneers.com/sports/womens-soccer/roster,sidearm
+SMU,D1,M,https://smumustangs.com/sports/mens-soccer/roster,sidearm
+SMU,D1,W,https://smumustangs.com/sports/womens-soccer/roster,sidearm
+Akron,D1,M,https://gozips.com/sports/mens-soccer/roster,sidearm
+Akron,D1,W,https://gozips.com/sports/womens-soccer/roster,sidearm
+Houston,D1,W,https://uhcougars.com/sports/womens-soccer/roster,sidearm
+North Carolina,D1,M,https://goheels.com/sports/mens-soccer/roster,sidearm
+Rutgers,D1,W,https://scarletknights.com/sports/womens-soccer/roster,sidearm
+TCU,D1,W,https://gofrogs.com/sports/womens-soccer/roster,sidearm
+Pittsburgh,D1,M,https://pittsburghpanthers.com/sports/mens-soccer/roster,sidearm
+Pittsburgh,D1,W,https://pittsburghpanthers.com/sports/womens-soccer/roster,sidearm
+Marshall,D1,M,https://herdzone.com/sports/mens-soccer/roster,sidearm
+Marshall,D1,W,https://herdzone.com/sports/womens-soccer/roster,sidearm
+Hofstra,D1,M,https://gohofstra.com/sports/mens-soccer/roster,sidearm
+Hofstra,D1,W,https://gohofstra.com/sports/womens-soccer/roster,sidearm
+Grand Valley State,D2,W,https://gvsulakers.com/sports/womens-soccer/roster,sidearm
+Colorado Mines,D2,M,https://minesathletics.com/sports/mens-soccer/roster,sidearm
+Colorado Mines,D2,W,https://minesathletics.com/sports/womens-soccer/roster,sidearm
+Saint Leo,D2,M,https://saintleolions.com/sports/mens-soccer/roster,sidearm
+Saint Leo,D2,W,https://saintleolions.com/sports/womens-soccer/roster,sidearm
+Rollins,D2,M,https://rollinssports.com/sports/mens-soccer/roster,sidearm
+Rollins,D2,W,https://rollinssports.com/sports/womens-soccer/roster,sidearm
+Flagler,D2,M,https://flaglerathletics.com/sports/mens-soccer/roster,sidearm
+Flagler,D2,W,https://flaglerathletics.com/sports/womens-soccer/roster,sidearm
+Wingate,D2,M,https://wingatebulldogs.com/sports/mens-soccer/roster,sidearm
+Wingate,D2,W,https://wingatebulldogs.com/sports/womens-soccer/roster,sidearm
+Lenoir-Rhyne,D2,M,https://lrbears.com/sports/mens-soccer/roster,sidearm
+Lenoir-Rhyne,D2,W,https://lrbears.com/sports/womens-soccer/roster,sidearm
+Queens (NC),D2,M,https://queensathletics.com/sports/mens-soccer/roster,sidearm
+Queens (NC),D2,W,https://queensathletics.com/sports/womens-soccer/roster,sidearm
+Nova Southeastern,D2,M,https://nsusharks.com/sports/mens-soccer/roster,sidearm
+Nova Southeastern,D2,W,https://nsusharks.com/sports/womens-soccer/roster,sidearm
+Palm Beach Atlantic,D2,M,https://pbasailfish.com/sports/mens-soccer/roster,sidearm
+Palm Beach Atlantic,D2,W,https://pbasailfish.com/sports/womens-soccer/roster,sidearm
+Johns Hopkins,D3,M,https://hopkinssports.com/sports/mens-soccer/roster,sidearm
+Johns Hopkins,D3,W,https://hopkinssports.com/sports/womens-soccer/roster,sidearm
+Christopher Newport,D3,M,https://cnusports.com/sports/mens-soccer/roster,sidearm
+Christopher Newport,D3,W,https://cnusports.com/sports/womens-soccer/roster,sidearm
+Ithaca,D3,M,https://athletics.ithaca.edu/sports/mens-soccer/roster,sidearm
+Ithaca,D3,W,https://athletics.ithaca.edu/sports/womens-soccer/roster,sidearm
+Skidmore,D3,W,https://skidmoreathletics.com/sports/womens-soccer/roster,sidearm
+Union (NY),D3,M,https://unionathletics.com/sports/mens-soccer/roster,sidearm
+Union (NY),D3,W,https://unionathletics.com/sports/womens-soccer/roster,sidearm
+RIT,D3,M,https://ritathletics.com/sports/mens-soccer/roster,sidearm
+Rochester,D3,M,https://uofrathletics.com/sports/mens-soccer/roster,sidearm
+Rochester,D3,W,https://uofrathletics.com/sports/womens-soccer/roster,sidearm
+Gettysburg,D3,M,https://gettysburgsports.com/sports/mens-soccer/roster,sidearm
+Swarthmore,D3,W,https://swarthmoreathletics.com/sports/womens-soccer/roster,sidearm
+Rio Grande,NAIA,M,https://redstormsports.com/sports/mens-soccer/roster,sidearm
+Rio Grande,NAIA,W,https://redstormsports.com/sports/womens-soccer/roster,sidearm
+Indiana Wesleyan,NAIA,M,https://iwuwildcats.com/sports/mens-soccer/roster,sidearm
+Indiana Wesleyan,NAIA,W,https://iwuwildcats.com/sports/womens-soccer/roster,sidearm
+Ottawa,NAIA,M,https://ottawabraves.com/sports/mens-soccer/roster,sidearm
+Ottawa,NAIA,W,https://ottawabraves.com/sports/womens-soccer/roster,sidearm
+Saint Xavier,NAIA,M,https://sxucougars.com/sports/mens-soccer/roster,sidearm
+Saint Xavier,NAIA,W,https://sxucougars.com/sports/womens-soccer/roster,sidearm
+Aquinas,NAIA,M,https://aqsaints.com/sports/mens-soccer/roster,sidearm
+Aquinas,NAIA,W,https://aqsaints.com/sports/womens-soccer/roster,sidearm
+Cornerstone,NAIA,M,https://cugoldeneagles.com/sports/mens-soccer/roster,sidearm
+Cornerstone,NAIA,W,https://cugoldeneagles.com/sports/womens-soccer/roster,sidearm

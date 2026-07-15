@@ -1,0 +1,32 @@
+# Render deployment for the Recruiting-Fit-Engine API (backend only).
+# Deploy via "New > Blueprint" pointed at this repo, or configure a Web Service
+# manually with the build/start commands below.
+services:
+  - type: web
+    name: recruiting-fit-engine-api
+    runtime: python
+    plan: starter                       # paid Starter tier
+    region: oregon                      # change if you prefer a different region
+    healthCheckPath: /api/health
+
+    # Build: install deps, then FORCE headless OpenCV (scenedetect pulls the
+    # non-headless opencv-python, which needs libGL and breaks on Linux), then run
+    # the loud native-dependency check so a bad cv2/ffmpeg fails the BUILD, not a
+    # production request.
+    buildCommand: >-
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      pip uninstall -y opencv-python opencv-python-headless &&
+      pip install --no-cache-dir opencv-python-headless==5.0.0.93 &&
+      python check_deps.py
+
+    # Start: bind 0.0.0.0 and use Render's injected $PORT. Single worker on
+    # purpose -- /api/moments is CPU-bound and synchronous; extra workers would
+    # multiply memory (OpenCV + video) without helping a single big request.
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+
+    envVars:
+      - key: API_SECRET_KEY
+        sync: false                     # set in the dashboard; never commit it
+      - key: PYTHON_VERSION
+        value: "3.11.9"                 # match the dev box; avoids wheel surprises

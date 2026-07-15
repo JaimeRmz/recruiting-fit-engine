@@ -1,0 +1,5 @@
+﻿test_footage/
+data/test-footage/
+__pycache__/
+*.pyc
+.env

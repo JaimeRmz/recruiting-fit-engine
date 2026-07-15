@@ -1,0 +1,268 @@
+{
+  "model": "fit_match_v1",
+  "target": "division (D1/D2/D3/NAIA)",
+  "n_players": 2062,
+  "n_schools": 43,
+  "effective_sample_size": 43,
+  "majority_baseline": 0.3637,
+  "features_final": [
+    "position",
+    "class_year",
+    "gender",
+    "hometown_state"
+  ],
+  "features_dropped": {
+    "major": ">84% null",
+    "club_team": ">84% null",
+    "height_in": "LEAK: present for 395 players, all D1. P(D1|height)=1.00",
+    "height_missing": "LEAK: encodes school CMS template, not athlete"
+  },
+  "encoding": "XGBoost native categorical (enable_categorical, tree_method=hist)",
+  "saved_model_arm": "D_grouped_split_no_height",
+  "arms": {
+    "A_random_split_all_features": {
+      "arm": "ARM A  random split + height  [REQUESTED -- both leaks active, do not trust]",
+      "accuracy": 0.661,
+      "macro_f1": 0.648,
+      "per_class": {
+        "D1": {
+          "precision": 0.769,
+          "recall": 0.733,
+          "f1-score": 0.751,
+          "support": 150.0
+        },
+        "D2": {
+          "precision": 0.554,
+          "recall": 0.681,
+          "f1-score": 0.611,
+          "support": 113.0
+        },
+        "D3": {
+          "precision": 0.636,
+          "recall": 0.563,
+          "f1-score": 0.598,
+          "support": 87.0
+        },
+        "NAIA": {
+          "precision": 0.685,
+          "recall": 0.587,
+          "f1-score": 0.632,
+          "support": 63.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          110,
+          27,
+          12,
+          1
+        ],
+        [
+          17,
+          77,
+          8,
+          11
+        ],
+        [
+          13,
+          20,
+          49,
+          5
+        ],
+        [
+          3,
+          15,
+          8,
+          37
+        ]
+      ]
+    },
+    "B_random_split_no_height": {
+      "arm": "ARM B  random split, no height  [school-identity leak still active]",
+      "accuracy": 0.523,
+      "macro_f1": 0.524,
+      "per_class": {
+        "D1": {
+          "precision": 0.523,
+          "recall": 0.54,
+          "f1-score": 0.531,
+          "support": 150.0
+        },
+        "D2": {
+          "precision": 0.488,
+          "recall": 0.558,
+          "f1-score": 0.521,
+          "support": 113.0
+        },
+        "D3": {
+          "precision": 0.519,
+          "recall": 0.46,
+          "f1-score": 0.488,
+          "support": 87.0
+        },
+        "NAIA": {
+          "precision": 0.615,
+          "recall": 0.508,
+          "f1-score": 0.557,
+          "support": 63.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          81,
+          38,
+          24,
+          7
+        ],
+        [
+          34,
+          63,
+          6,
+          10
+        ],
+        [
+          31,
+          13,
+          40,
+          3
+        ],
+        [
+          9,
+          15,
+          7,
+          32
+        ]
+      ]
+    },
+    "C_grouped_split_all_features": {
+      "arm": "ARM C  unseen schools + height  [template artifact only]",
+      "accuracy": 0.549,
+      "macro_f1": 0.5172,
+      "per_class": {
+        "D1": {
+          "precision": 0.671,
+          "recall": 0.625,
+          "f1-score": 0.647,
+          "support": 750.0
+        },
+        "D2": {
+          "precision": 0.498,
+          "recall": 0.59,
+          "f1-score": 0.54,
+          "support": 563.0
+        },
+        "D3": {
+          "precision": 0.463,
+          "recall": 0.54,
+          "f1-score": 0.499,
+          "support": 433.0
+        },
+        "NAIA": {
+          "precision": 0.508,
+          "recall": 0.307,
+          "f1-score": 0.383,
+          "support": 316.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          469,
+          149,
+          105,
+          27
+        ],
+        [
+          99,
+          332,
+          95,
+          37
+        ],
+        [
+          84,
+          85,
+          234,
+          30
+        ],
+        [
+          47,
+          101,
+          71,
+          97
+        ]
+      ]
+    },
+    "D_grouped_split_no_height": {
+      "arm": "ARM D  unseen schools, no height  [*** THE HONEST NUMBER ***]",
+      "accuracy": 0.4243,
+      "macro_f1": 0.4117,
+      "per_class": {
+        "D1": {
+          "precision": 0.42,
+          "recall": 0.459,
+          "f1-score": 0.438,
+          "support": 750.0
+        },
+        "D2": {
+          "precision": 0.409,
+          "recall": 0.444,
+          "f1-score": 0.426,
+          "support": 563.0
+        },
+        "D3": {
+          "precision": 0.455,
+          "recall": 0.453,
+          "f1-score": 0.454,
+          "support": 433.0
+        },
+        "NAIA": {
+          "precision": 0.423,
+          "recall": 0.269,
+          "f1-score": 0.329,
+          "support": 316.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          344,
+          223,
+          121,
+          62
+        ],
+        [
+          207,
+          250,
+          76,
+          30
+        ],
+        [
+          138,
+          75,
+          196,
+          24
+        ],
+        [
+          130,
+          63,
+          38,
+          85
+        ]
+      ]
+    }
+  },
+  "permutation_test": {
+    "n_permutations": 30,
+    "observed_accuracy": 0.4243,
+    "null_mean": 0.3104,
+    "null_sd": 0.039,
+    "null_max": 0.3773,
+    "p_value": 0.0,
+    "school_level_majority_vote_accuracy": 0.5581,
+    "schools_correct": "24/43"
+  },
+  "feature_importance_final": {
+    "hometown_state": 0.6103,
+    "gender": 0.1391,
+    "position": 0.1289,
+    "class_year": 0.1218
+  }
+}

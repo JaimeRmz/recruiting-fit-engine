@@ -1,0 +1,35 @@
+# Runtime dependencies for the DEPLOYED API (main.py) only.
+#
+# Curated deliberately, not `pip freeze` -- a freeze from the Windows dev box
+# would pin Windows-only packages (pywin32, etc.) that fail to install on Render's
+# Linux. These are exactly what `main.py` imports transitively:
+#   main -> compare_athletes -> enrich_with_census  (pandas, numpy, scipy, requests)
+#   main -> moment_finder                           (opencv, numpy, scenedetect, imageio-ffmpeg)
+#   main                                            (fastapi, uvicorn, python-multipart, pydantic)
+#
+# NOT included, on purpose: xgboost, scikit-learn (train_fit_match.py only),
+# markdownify, html2text (scrape_rosters.py only). main.py imports none of them,
+# and xgboost alone would add ~300 MB to every build for zero runtime benefit. If
+# you later want the training scripts deployable, add: xgboost==3.1.1  scikit-learn==...
+
+# --- Web API ---
+fastapi==0.139.0
+uvicorn[standard]==0.51.0
+python-multipart==0.0.32
+pydantic==2.13.4
+
+# --- Comparables (roster lookup) ---
+pandas==3.0.3
+numpy==2.4.6
+scipy==1.17.1
+requests==2.34.2
+
+# --- Moment-finder CV pipeline ---
+# IMPORTANT (Linux): use opencv-python-HEADLESS, never opencv-python. The full
+# build links libGL.so.1, which is absent from Render's slim image -> ImportError
+# at runtime. scenedetect hard-depends on the non-headless opencv-python, so the
+# build command (see render.yaml) uninstalls it and reinstalls headless. This pin
+# is the intended cv2 provider; check_deps.py verifies it at build time.
+opencv-python-headless==5.0.0.93
+scenedetect==0.7
+imageio-ffmpeg==0.6.0
