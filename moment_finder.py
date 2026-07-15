@@ -30,6 +30,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 
 import cv2
@@ -58,6 +59,13 @@ import numpy as np
 
 MOTION_WIDTH = 320          # analysis width in px; motion is scale-invariant enough
 DIFF_PIXEL_THRESH = 25      # per-pixel intensity delta counted as "moved" (0-255)
+# Cap the width of the video actually fed to analysis. Peak memory otherwise scales
+# with the UPLOAD's resolution: a 512MB container holds the Python process AND the
+# ffmpeg subprocess together, and full-res frame decode + PySceneDetect + libx264
+# clip encoding at 4K blows past that. 640px is well above the 320px the motion
+# stage needs and keeps scene-cut detail, while collapsing the footprint to a fixed
+# ceiling no matter what a user uploads.
+PREPROCESS_MAX_WIDTH = 640
 
 
 def find_ffmpeg():
@@ -70,6 +78,64 @@ def find_ffmpeg():
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return None
+
+
+def _safe_unlink(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def _video_width(video_path):
+    """Frame width in px via OpenCV metadata (0 if unreadable). Cheap; no decode."""
+    cap = cv2.VideoCapture(str(video_path))
+    try:
+        return int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) if cap.isOpened() else 0
+    finally:
+        cap.release()
+
+
+def downscale_for_analysis(video_path, ffmpeg, max_width=PREPROCESS_MAX_WIDTH):
+    """
+    Return a video no wider than `max_width`, transcoding down only if needed.
+
+    This is the memory safety net: every downstream stage (frame decode, scene
+    detection, per-clip re-encoding) then runs at a bounded resolution, so a 4K
+    upload and a 480p upload land at roughly the same footprint. ffmpeg does the
+    downscale in a streaming pass, so the transcode itself stays light too.
+
+    Only ever downscales -- a sub-`max_width` input is returned untouched (it is
+    already cheap, and upscaling would waste work). Returns (path_to_use, is_temp);
+    when is_temp is True the caller owns the temp file and must delete it.
+    """
+    if not ffmpeg:
+        return video_path, False
+    w = _video_width(video_path)
+    if not w or w <= max_width:
+        return video_path, False
+
+    fd, out = tempfile.mkstemp(prefix="mf_scaled_", suffix=".mp4")
+    os.close(fd)
+    # -threads 2 on BOTH the decoder (before -i) and encoder (after) is the key
+    # memory bound here: multi-threaded 4K H.264 decode otherwise holds one large
+    # reference frame per thread, and an unbounded auto-thread count on a many-core
+    # host balloons that to gigabytes. Two threads keeps decode buffers small while
+    # still transcoding faster than real time. ultrafast trims encoder lookahead too.
+    cmd = [ffmpeg, "-y", "-loglevel", "error", "-threads", "2", "-i", str(video_path),
+           # scale=W:-2 preserves aspect ratio and forces an even height (libx264).
+           "-vf", f"scale={max_width}:-2",
+           "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+           "-threads", "2", "-c:a", "aac", "-movflags", "+faststart", out]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(out) or os.path.getsize(out) == 0:
+        # Fall back to the original rather than crash, but say so loudly -- on a
+        # huge input this reintroduces the OOM risk this step exists to remove.
+        print(f"  WARNING: downscale failed ({w}px input), analyzing original: "
+              f"{r.stderr.strip()[:160]}")
+        _safe_unlink(out)
+        return video_path, False
+    return out, True
 
 
 @dataclass
@@ -301,44 +367,60 @@ def find_moments(video_path, outdir="clips", content_threshold=27.0,
                  motion_percentile=92.0, motion_abs_threshold=None,
                  smooth_sec=1.0, min_burst_sec=1.0, merge_window=2.0,
                  pre=3.0, post=5.0, sample_stride=3, max_candidates=None,
-                 write_clips=True):
+                 write_clips=True, preprocess=True,
+                 preprocess_max_width=PREPROCESS_MAX_WIDTH):
     if not os.path.exists(video_path):
         raise FileNotFoundError(video_path)
 
     print(f"analyzing {video_path}")
-    times, scores, meta = motion_series(video_path, sample_stride)
-    print(f"  {meta['width']}x{meta['height']} @ {meta['fps']:.2f} fps, "
-          f"{meta['duration'] / 60:.1f} min, {meta['frames']} frames "
-          f"({len(scores)} sampled)")
+    ffmpeg = find_ffmpeg()
 
-    bursts = motion_bursts(times, scores, meta["fps"], sample_stride,
-                           percentile=motion_percentile,
-                           abs_threshold=motion_abs_threshold,
-                           smooth_sec=smooth_sec, min_burst_sec=min_burst_sec)
-    print(f"  motion bursts : {len(bursts)}")
+    # Memory safety net: run the whole pipeline against a resolution-capped copy so
+    # peak memory never scales with the upload. motion_series, scene_cuts, AND clip
+    # extraction all read `work_path`, so none of them ever touch a full 4K frame.
+    work_path, is_temp = (
+        downscale_for_analysis(video_path, ffmpeg, preprocess_max_width)
+        if preprocess else (video_path, False))
+    if is_temp:
+        print(f"  pre-scaled to <= {preprocess_max_width}px wide for analysis "
+              "(bounds peak memory)")
 
-    print("  scene detection...")
-    cuts = scene_cuts(video_path, content_threshold)
-    print(f"  scene cuts    : {len(cuts)}")
+    try:
+        times, scores, meta = motion_series(work_path, sample_stride)
+        print(f"  {meta['width']}x{meta['height']} @ {meta['fps']:.2f} fps, "
+              f"{meta['duration'] / 60:.1f} min, {meta['frames']} frames "
+              f"({len(scores)} sampled)")
 
-    cands = merge_candidates(bursts, cuts, merge_window)
-    if max_candidates:
-        cands = cands[:max_candidates]
+        bursts = motion_bursts(times, scores, meta["fps"], sample_stride,
+                               percentile=motion_percentile,
+                               abs_threshold=motion_abs_threshold,
+                               smooth_sec=smooth_sec, min_burst_sec=min_burst_sec)
+        print(f"  motion bursts : {len(bursts)}")
 
-    if write_clips:
-        ffmpeg = find_ffmpeg()
-        if not ffmpeg:
-            print("\n  ffmpeg not found -- skipping clip extraction.")
-            print("  install it, or: pip install imageio-ffmpeg")
-        else:
-            os.makedirs(outdir, exist_ok=True)
-            print(f"  extracting {len(cands)} clips -> {outdir}/")
-            for i, c in enumerate(cands, 1):
-                c.clip_path = extract_clip(ffmpeg, video_path, c.time, outdir, i,
-                                           pre, post, meta["duration"])
+        print("  scene detection...")
+        cuts = scene_cuts(work_path, content_threshold)
+        print(f"  scene cuts    : {len(cuts)}")
 
-    summarize(cands, meta)
-    return cands
+        cands = merge_candidates(bursts, cuts, merge_window)
+        if max_candidates:
+            cands = cands[:max_candidates]
+
+        if write_clips:
+            if not ffmpeg:
+                print("\n  ffmpeg not found -- skipping clip extraction.")
+                print("  install it, or: pip install imageio-ffmpeg")
+            else:
+                os.makedirs(outdir, exist_ok=True)
+                print(f"  extracting {len(cands)} clips -> {outdir}/")
+                for i, c in enumerate(cands, 1):
+                    c.clip_path = extract_clip(ffmpeg, work_path, c.time, outdir, i,
+                                               pre, post, meta["duration"])
+
+        summarize(cands, meta)
+        return cands
+    finally:
+        if is_temp:
+            _safe_unlink(work_path)
 
 
 def summarize(cands, meta):
