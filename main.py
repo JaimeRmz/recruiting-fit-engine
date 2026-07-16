@@ -113,7 +113,11 @@ app.add_middleware(
     # 5173 to 5174+ whenever 5173 is busy, which silently changes the browser's
     # Origin and is the usual cause of a "No Access-Control-Allow-Origin" preflight
     # failure in local dev. Production origins stay explicit in CORS_ORIGINS above.
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    # Private LAN ranges (10/8, 192.168/16, 172.16-31/12) are allowed too, so the
+    # dev server reached from a phone on the same wifi (e.g. http://192.168.x.x:5173)
+    # isn't blocked. Those origins only exist on a local network, and /api/moments
+    # stays gated by X-API-Key.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],  # wildcard already reflects X-API-Key on the preflight
