@@ -67,7 +67,7 @@ _JOBS_LOCK = threading.Lock()
 # with the module, rather than relying on the library defaults.
 MOTION_PERCENTILE = 92.0
 CLIP_PRE_SEC = 4.5
-CLIP_POST_SEC = 5.0
+CLIP_POST_SEC = 7.0
 
 # Vite dev server (local) + deployed frontend. The Vercel entry is a PLACEHOLDER
 # to be swapped for the real domain once the frontend ships.
