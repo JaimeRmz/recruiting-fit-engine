@@ -69,8 +69,8 @@ MOTION_PERCENTILE = 92.0
 CLIP_PRE_SEC = 4.5
 CLIP_POST_SEC = 7.0
 
-# Vite dev server (local) + deployed frontend. The Vercel entry is a PLACEHOLDER
-# to be swapped for the real domain once the frontend ships.
+# Vite dev server (local) + deployed frontend. The Vercel entry is the stable
+# production domain (per-deploy hash URLs are not covered).
 CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
