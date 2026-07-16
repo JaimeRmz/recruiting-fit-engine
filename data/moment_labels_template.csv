@@ -1,0 +1,13 @@
+timestamp,description
+# Hand-label the notable moments you'd actually want in a highlight reel.
+# One row per moment. Copy this file, fill it in, and pass it to eval_recall.py:
+#     python eval_recall.py <your_video.mp4> <your_labels.csv>
+#
+# timestamp: mm:ss (6:31), mm:ss.ss (6:31.80), h:mm:ss, or plain seconds (391.8).
+#            Use the time as it appears in the segment you point the script at.
+# description: free text -- what happens (helps you sanity-check misses later).
+# Lines starting with # are ignored; delete these and the examples below.
+#
+# 6:31,shot on goal from top of the box
+# 12:39,breakaway run down the right wing
+# 13:58,goalkeeper diving save
