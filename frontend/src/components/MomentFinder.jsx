@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
-import { findMoments, clipUrl } from '../api.js'
+import { useEffect, useRef, useState } from 'react'
+import { submitMoments, getMomentStatus, clipUrl } from '../api.js'
 import JerseyBadge from './JerseyBadge.jsx'
+
+const POLL_INTERVAL_MS = 4000
 
 const SIGNAL_LABELS = {
   motion: 'Motion',
@@ -19,7 +21,7 @@ function messageFor(err) {
     case 'too_large':
       return (
         err.message ||
-        'That clip is over the limit. Trim it to 3 minutes / 500MB — the segment you want reviewed — and try again.'
+        'That clip is over the limit. Trim it to 20 minutes / 500MB — the segment you want reviewed — and try again.'
       )
     case 'unconfigured':
       return 'The analysis service is temporarily unavailable (server key not set). Try again shortly.'
@@ -37,17 +39,53 @@ export default function MomentFinder() {
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
 
+  // Polling control. runId invalidates a stale poll loop when the user resubmits
+  // or the component unmounts, so we never keep hitting the endpoint after done.
+  const runIdRef = useRef(0)
+  const timerRef = useRef(null)
+
+  useEffect(() => () => {
+    runIdRef.current += 1
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }, [])
+
+  function schedulePoll(jobId, myRun) {
+    timerRef.current = setTimeout(async () => {
+      if (runIdRef.current !== myRun) return // superseded — stop polling
+      try {
+        const res = await getMomentStatus(jobId)
+        if (runIdRef.current !== myRun) return
+        if (res.status === 'complete') {
+          setData(res)
+          setStatus('done')
+        } else if (res.status === 'failed') {
+          setError(res.error || 'Analysis failed on the server. Try a different clip.')
+          setStatus('error')
+        } else {
+          schedulePoll(jobId, myRun) // still processing — poll again
+        }
+      } catch (err) {
+        if (runIdRef.current !== myRun) return
+        setError(messageFor(err))
+        setStatus('error')
+      }
+    }, POLL_INTERVAL_MS)
+  }
+
   async function onSubmit(e) {
     e.preventDefault()
     if (!file) return
+    const myRun = (runIdRef.current += 1) // cancel any in-flight poll loop
+    if (timerRef.current) clearTimeout(timerRef.current)
     setStatus('loading')
     setError(null)
     setData(null)
     try {
-      const res = await findMoments(file)
-      setData(res)
-      setStatus('done')
+      const { job_id } = await submitMoments(file)
+      if (runIdRef.current !== myRun) return
+      schedulePoll(job_id, myRun)
     } catch (err) {
+      if (runIdRef.current !== myRun) return
       setError(messageFor(err))
       setStatus('error')
     }
@@ -71,9 +109,9 @@ export default function MomentFinder() {
         <div className="constraint" role="note">
           <span className="constraint__icon" aria-hidden="true">↑</span>
           <p>
-            <strong>Upload a clip up to 3 minutes and 500MB.</strong> Trim to the
-            segment you want reviewed — this tool is built for focused passages, not
-            full matches.
+            <strong>Upload a clip up to 20 minutes and 500MB.</strong> Trim to the
+            segment you want reviewed — a half, a period, or the passage you care
+            about.
           </p>
         </div>
 
@@ -96,7 +134,7 @@ export default function MomentFinder() {
             ) : (
               <>
                 <span className="dropzone__cta">Choose a video file</span>
-                <span className="dropzone__hint">MP4 or similar, up to 3 min / 500MB</span>
+                <span className="dropzone__hint">MP4 or similar, up to 20 min / 500MB</span>
               </>
             )}
           </span>
@@ -124,8 +162,10 @@ export default function MomentFinder() {
             </div>
             <p className="analyzing__title">Analyzing your footage</p>
             <p className="analyzing__sub">
-              This takes a few minutes — the pipeline reads every frame and extracts
-              a clip for each candidate. Keep this tab open.
+              This can take up to ~11 minutes for a full-length upload — the
+              pipeline reads every frame and extracts a clip for each candidate.
+              Feel free to leave this tab open in the background; results appear
+              here automatically when it finishes.
             </p>
           </div>
         )}

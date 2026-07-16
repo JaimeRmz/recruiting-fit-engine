@@ -52,7 +52,11 @@ export async function getComparables({ position, hometown_state, gender, class_y
   return res.json()
 }
 
-export async function findMoments(file) {
+// Moment analysis is a background job: submit the upload for a job_id, then poll
+// the status endpoint until it is 'complete' or 'failed'.
+
+// POST /api/moments/submit -> { job_id, status: 'processing' }
+export async function submitMoments(file) {
   // Surface a missing key before spending an upload on a guaranteed 401.
   if (!API_KEY || API_KEY === 'your-api-key-here') {
     throw new ApiError(
@@ -66,7 +70,7 @@ export async function findMoments(file) {
 
   let res
   try {
-    res = await fetch(`${API_BASE}/api/moments`, {
+    res = await fetch(`${API_BASE}/api/moments/submit`, {
       method: 'POST',
       headers: { 'X-API-Key': API_KEY },
       body: form,
@@ -80,7 +84,24 @@ export async function findMoments(file) {
     if (res.status === 401) throw new ApiError('auth', detail)
     if (res.status === 413) throw new ApiError('too_large', detail)
     if (res.status === 503) throw new ApiError('unconfigured', detail)
-    throw new ApiError('server', detail || `Analysis failed (${res.status}).`)
+    throw new ApiError('server', detail || `Submit failed (${res.status}).`)
+  }
+  return res.json()
+}
+
+// GET /api/moments/status/{job_id} -> { status, ...candidates when complete }
+export async function getMomentStatus(jobId) {
+  let res
+  try {
+    res = await fetch(`${API_BASE}/api/moments/status/${jobId}`)
+  } catch {
+    throw new ApiError('network', 'Lost contact with the analysis service.')
+  }
+  if (!res.ok) {
+    const detail = await detailOf(res)
+    if (res.status === 404)
+      throw new ApiError('server', detail || 'This analysis job expired or was not found.')
+    throw new ApiError('server', detail || `Status check failed (${res.status}).`)
   }
   return res.json()
 }
