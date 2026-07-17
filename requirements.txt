@@ -33,3 +33,8 @@ requests==2.34.2
 opencv-python-headless==5.0.0.93
 scenedetect==0.7
 imageio-ffmpeg==0.6.0
+
+# --- Outreach Assistant (LLM email drafting) ---
+# Only /api/outreach/draft uses this. That endpoint has a REAL per-call cost
+# (Anthropic API usage), unlike everything else here -- it stays behind X-API-Key.
+anthropic==0.117.0

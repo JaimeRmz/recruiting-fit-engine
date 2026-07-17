@@ -28,6 +28,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
+import anthropic
 import cv2
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -80,6 +81,81 @@ CORS_ORIGINS = [
 # Shared-secret gate for the compute-heavy /api/moments endpoint. Read from the
 # environment; never hardcode. /api/comparables and /api/health stay open.
 API_SECRET_KEY = os.environ.get("API_SECRET_KEY")
+
+# Outreach Assistant (/api/outreach/draft) config.
+#
+# COST NOTE: unlike everything else in this app, this endpoint makes a paid
+# Anthropic API call on every request -- it costs real money per draft. It stays
+# behind the same X-API-Key gate as /api/moments, and it must NOT be called in a
+# loop during testing. Model + token budget are deliberately small: a first-
+# contact recruiting email is short prose, so Haiku with a ~500-token cap is
+# plenty (and cheap). Key is read live from the env, same pattern as the others.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+# Sonnet 5, not Haiku: testing showed Haiku unreliably dropped specific provided
+# facts (the athlete's own reasons for interest) and genericized the email, even
+# with a foregrounded prompt. A first-contact email is short and low-volume, so
+# the stronger model's cost is negligible and the fidelity is worth it.
+OUTREACH_MODEL = "claude-sonnet-5"
+OUTREACH_MAX_TOKENS = 500
+
+# The one instruction that makes this feature honest: it drafts PROSE from given
+# facts, it does not retrieve facts. Everything the athlete didn't supply becomes
+# a bracketed placeholder they must verify -- never an invented name/email/date.
+OUTREACH_SYSTEM_PROMPT = """You draft a short, first-contact recruiting email from a high-school soccer player to a college coach.
+
+ABSOLUTE RULES -- never break these:
+- Use ONLY facts explicitly provided in the user's message. Do not invent, guess, or infer anything not given.
+- NEVER invent a coach's name, an email address, a phone number, a specific date, an NCAA contact-period window, roster spots, program history, or any school-specific fact that was not provided.
+- For anything the email needs but was not provided, insert a clearly bracketed placeholder for the athlete to fill in, e.g. "[Coach's name -- check the athletics staff directory]" or "[verify your sport's current NCAA contact period]". When a normal email would name the coach, use the placeholder rather than omitting it.
+- Do NOT imply the athlete has already contacted, spoken with, met, or heard from anyone. This is a FIRST contact.
+- Do not fabricate statistics, achievements, or reasons for interest. If "why interested" is not provided, use a neutral bracketed placeholder like "[in your own words: what specifically draws you to this program]" instead of making something up.
+
+REQUIRED STRUCTURE -- every draft, no exceptions:
+- If you include a subject line, put it on the first line.
+- The email body MUST open with exactly this greeting line, verbatim: "Dear [Coach's name -- check the athletics staff directory]," -- use it in EVERY draft, always, because a coach's name is never provided. Never start with anything else and never omit the greeting.
+- Then two or three short paragraphs, then a brief sign-off with bracketed placeholders for the athlete's name and contact info.
+
+USE EVERY PROVIDED FACT -- never drop one:
+- Incorporate every fact given in the user's message into the body: position, class year, and home state always; GPA whenever it is provided (state the GPA explicitly, e.g. "I carry a 3.8 GPA").
+- If "why interested" is provided, it is the MOST IMPORTANT content of the email: build the message around it and make it the most prominent part, faithful to the athlete's own words and reasons. NEVER drop it or replace it with generic language.
+- If "why interested" is NOT provided, use the bracketed placeholder for it (never invent a reason).
+- If a highlight clip is provided, reference/link it near the end.
+
+STYLE (researched best practice):
+- Lead with genuine, specific interest in THIS program and why the athlete is a fit -- not a stats dump.
+- Concise and professional; warm but not overfamiliar; no hype and no exclamation-point spam. It must read well in a coach's inbox.
+- Weave the facts in naturally, not as a bulleted resume.
+- End with a clear, low-pressure ask (interest in the program and willingness to share more film or info).
+
+WORKED EXAMPLE (illustrative only -- a DIFFERENT athlete and sport; the real athlete's sport, position, and facts always come from the user message below). It shows how to weave every specific reason into the body instead of genericizing it away:
+
+Given these facts:
+  CENTRAL THEME: "I'm drawn to your marine biology program and the fast, aggressive serve-receive system your team plays, and I want to stay on the West Coast."
+  - Athlete's position: outside hitter
+  - Squad: women's volleyball
+  - Athlete's home state: Oregon
+  - Athlete's class year: junior
+  - Target program: Coastal State University (D2)
+  - Athlete's GPA: 3.7
+
+A strong email body:
+
+Dear [Coach's name -- check the athletics staff directory],
+
+I'm a junior outside hitter from Oregon, and I'm reaching out because two things about Coastal State stand out to me: your marine biology program and the fast, aggressive serve-receive system your team plays. Staying on the West Coast matters to me as well, and Coastal State fits that. I carry a 3.7 GPA and take academics as seriously as I take my game.
+
+I'd love to learn whether my game is a fit for what you're building. I'd be glad to send match film or answer any questions you have.
+
+Thank you for your time and for considering my interest.
+
+Best regards,
+[Your name]
+[Your phone number]
+[Your email address]
+
+Notice how the marine biology program, the serve-receive style, the West-Coast reason, the 3.7 GPA, the position, the state, and the class year ALL appear in the body -- none dropped, none replaced with generic "balancing academics and athletics" filler. Do exactly this with whatever specifics the real athlete provides.
+
+Now write ONLY the email itself, for the athlete described in the next message. You may include a subject line as the first line. No preamble, no commentary, no markdown formatting."""
 
 # Known limitations, echoed in every /api/moments response. These are the ceiling
 # of what the tool claims; the frontend should surface them, not bury them.
@@ -158,6 +234,31 @@ class ComparablesResponse(BaseModel):
         None, description="Overall match basis: 'state', 'region', or null if "
         "no matches. On 'region', results are NOT from the requested state.")
     results: list[ComparablePlayer]
+
+
+class OutreachRequest(BaseModel):
+    # Already-known athlete data (from the Comparator inputs) + the chosen real
+    # program (from a Comparator result row). Optional fields are exactly that --
+    # anything left blank becomes a bracketed placeholder in the draft, never an
+    # invented fact.
+    position: str = Field(..., description="GK, D, M, F (exact).", examples=["M"])
+    hometown_state: str = Field(..., examples=["Texas"])
+    gender: str = Field(..., description="M or W (exact).", examples=["W"])
+    class_year: str | None = Field(None, examples=["Jr"])
+    school: str = Field(..., description="The chosen real program.",
+                        examples=["Trinity University"])
+    division: str = Field(..., examples=["D3"])
+    gpa: str | None = Field(None, description="Optional; free text so '3.8' or "
+                            "'3.8 unweighted' both work.", examples=["3.8"])
+    why_interested: str | None = Field(
+        None, description="Optional; the athlete's own words on why this program.")
+    clip_url: str | None = Field(
+        None, description="Optional highlight-clip URL to reference in the email.")
+
+
+class OutreachResponse(BaseModel):
+    draft: str = Field(..., description="Editable email DRAFT. Not verified contact "
+                       "info; placeholders must be filled in by the athlete.")
 
 
 class MomentCandidate(BaseModel):
@@ -300,6 +401,128 @@ def comparables(req: ComparablesRequest):
         match_type=rows[0]["match_type"] if rows else None,
         results=rows,
     )
+
+
+def _build_outreach_user_message(req: "OutreachRequest") -> str:
+    """Render the provided facts into an explicit, labeled block, FOREGROUNDING the
+    athlete's reason for interest as the email's central theme so the model builds
+    around its specific content instead of genericizing it. Fields the athlete did
+    NOT provide are simply absent here -- the system prompt turns each gap into a
+    bracketed placeholder, never an invention."""
+    pos = {"GK": "goalkeeper", "D": "defender", "M": "midfielder",
+           "F": "forward"}.get(req.position.strip().upper(), req.position)
+    squad = {"M": "men's", "W": "women's"}.get(req.gender.strip().upper(),
+                                               req.gender)
+    why = (req.why_interested or "").strip()
+
+    lines = ["Draft a first-contact recruiting email using ONLY the facts below.",
+             ""]
+
+    # Foreground the reason FIRST and loudly when provided -- listing it as one
+    # bullet among many led Haiku to weight it equally and flatten it.
+    if why:
+        lines += [
+            "CENTRAL THEME of the email -- this is the athlete's own reason for "
+            "interest, and it MUST be the most prominent content of the message. "
+            "Build the email around the SPECIFIC points below and incorporate them "
+            "faithfully (paraphrasing is fine; verbatim quoting is not required). "
+            'Do NOT flatten them into generic "balancing academics and athletics" '
+            "language that could describe any athlete -- the specific reasons must "
+            "be recognizable in the final email:",
+            f"    {why}",
+            "",
+        ]
+
+    lines += [
+        "Facts to include in the body:",
+        f"- Athlete's position: {pos}",
+        f"- Squad: {squad} soccer",
+        f"- Athlete's home state: {req.hometown_state}",
+    ]
+    if req.class_year:
+        lines.append(f"- Athlete's class year: {req.class_year}")
+    lines.append(f"- Target program: {req.school} ({req.division})")
+    if req.gpa and req.gpa.strip():
+        lines.append(f"- Athlete's GPA: {req.gpa.strip()} (state this explicitly)")
+    if not why:
+        lines.append("- Why interested: NOT PROVIDED -- use a bracketed "
+                     "placeholder, do not invent a reason.")
+
+    if req.clip_url and req.clip_url.strip():
+        lines += [
+            "",
+            "Highlight clip to reference near the end. Insert this URL as PLAIN "
+            "TEXT, exactly as written -- do NOT wrap it in markdown link syntax, "
+            "brackets, or parentheses:",
+            f"    {req.clip_url.strip()}",
+        ]
+
+    lines += [
+        "",
+        "The coach's name and email address were NOT provided -- use bracketed "
+        "placeholders for both. Do not invent any other program-specific fact.",
+    ]
+    return "\n".join(lines)
+
+
+@app.post("/api/outreach/draft", response_model=OutreachResponse)
+def outreach_draft(req: OutreachRequest, _auth: None = Depends(require_api_key)):
+    """
+    Draft a first-contact recruiting email from the athlete's known facts and a
+    real target program. PROSE GENERATION, not fact retrieval: it never invents a
+    coach name, email, date, or any school-specific fact -- missing details come
+    back as bracketed placeholders the athlete must verify.
+
+    Requires X-API-Key. COST: each call hits the paid Anthropic API. Do not loop.
+    """
+    pos = req.position.strip().upper()
+    gen = req.gender.strip().upper()
+    if pos not in VALID_POSITIONS:
+        raise HTTPException(400, f"position must be one of {sorted(VALID_POSITIONS)}.")
+    if gen not in VALID_GENDERS:
+        raise HTTPException(400, f"gender must be one of {sorted(VALID_GENDERS)}.")
+    if not req.school.strip() or not req.division.strip():
+        raise HTTPException(400, "school and division are required.")
+
+    key = os.environ.get("ANTHROPIC_API_KEY") or ANTHROPIC_API_KEY
+    if not key:
+        raise HTTPException(
+            status_code=503,
+            detail="Outreach drafting is unavailable (ANTHROPIC_API_KEY is not "
+                   "set on the server).")
+
+    try:
+        client = anthropic.Anthropic(api_key=key)
+        msg = client.messages.create(
+            model=OUTREACH_MODEL,
+            max_tokens=OUTREACH_MAX_TOKENS,
+            system=OUTREACH_SYSTEM_PROMPT,
+            messages=[{"role": "user",
+                       "content": _build_outreach_user_message(req)}],
+        )
+    except anthropic.APIStatusError as e:
+        # Upstream returned an HTTP error (rate limit, auth, overloaded, ...).
+        raise HTTPException(
+            status_code=502,
+            detail=f"The drafting service returned an error ({e.status_code}). "
+                   "Please try again in a moment.")
+    except anthropic.APIError:
+        # Connection/timeout/other SDK-level failure.
+        raise HTTPException(
+            status_code=502,
+            detail="The drafting service is temporarily unreachable. Please try "
+                   "again in a moment.")
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not generate a draft right now. Please try again.")
+
+    text = "".join(b.text for b in msg.content
+                   if getattr(b, "type", None) == "text").strip()
+    if not text:
+        raise HTTPException(status_code=502,
+                            detail="The draft came back empty. Please try again.")
+    return OutreachResponse(draft=text)
 
 
 def _build_candidates(cands, job_id):
