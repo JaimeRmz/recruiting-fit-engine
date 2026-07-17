@@ -677,6 +677,136 @@ a:hover {
   border-color: var(--cone-orange);
 }
 
+/* ------------------------------------------------- OUTREACH ASSISTANT */
+.outreach {
+  margin-top: 2rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background-color: var(--turf-green-dim);
+  background-image: var(--noise);
+  border: var(--glass-border);
+  box-shadow: var(--glass-edge);
+  border-radius: var(--radius);
+  border-top: 3px solid var(--cone-orange);
+}
+.outreach__intro {
+  margin-bottom: 1.5rem;
+}
+.outreach__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.005em;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  line-height: 1.05;
+  margin: 0 0 0.6rem;
+}
+.outreach__lede {
+  color: var(--chalk-white);
+  max-width: 60ch;
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.outreach-form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* Text inputs + textareas match the existing .select surface exactly. */
+.text-input,
+.textarea {
+  width: 100%;
+  max-width: 100%;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--chalk-white);
+  background: var(--charcoal-raised);
+  border: 1px solid var(--turf-line);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.text-input {
+  max-width: 340px;
+}
+.textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+.text-input:hover,
+.textarea:hover {
+  border-color: var(--overcast-grey);
+}
+.text-input:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--cone-orange);
+  box-shadow: 0 0 0 3px rgba(var(--cone-orange-rgb), 0.12);
+}
+.text-input::placeholder,
+.textarea::placeholder {
+  color: var(--overcast-grey);
+}
+
+.outreach-result {
+  margin-top: 1.75rem;
+  display: grid;
+  gap: 0.9rem;
+}
+/* Static, non-LLM disclaimer -- always shown with the draft. */
+.outreach-note {
+  background: rgba(var(--cone-orange-rgb), 0.1);
+  border: 1px solid var(--cone-orange);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+}
+.outreach-note .notice__tag {
+  color: var(--cone-orange);
+}
+.outreach-note p {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+}
+.outreach-draft {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--chalk-white);
+  background: var(--pitch-charcoal);
+  border: 1px solid var(--turf-line);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  resize: vertical;
+}
+.outreach-draft:focus-visible {
+  border-color: var(--cone-orange);
+  box-shadow: 0 0 0 3px rgba(var(--cone-orange-rgb), 0.12);
+}
+.outreach__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+/* Quieter than the cone-orange .cta -- an outline button for a utility action. */
+.btn-secondary {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.95rem;
+  color: var(--chalk-white);
+  background: transparent;
+  border: 1px solid var(--turf-line);
+  border-radius: var(--radius);
+  padding: 0.65rem 1.4rem;
+  cursor: pointer;
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
+}
+.btn-secondary:hover {
+  border-color: var(--cone-orange);
+  background: rgba(var(--cone-orange-rgb), 0.08);
+  box-shadow: 0 0 0 3px rgba(var(--cone-orange-rgb), 0.1);
+}
+
 /* ------------------------------------------------- MOMENT-FINDER extras */
 .constraint {
   display: flex;

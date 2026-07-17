@@ -52,6 +52,38 @@ export async function getComparables({ position, hometown_state, gender, class_y
   return res.json()
 }
 
+// POST /api/outreach/draft -> { draft }
+// Requires the X-API-Key secret (same as moments). NOTE: each call is a real,
+// paid LLM request server-side -- the UI should not call this in a loop.
+export async function draftOutreach(payload) {
+  if (!API_KEY || API_KEY === 'your-api-key-here') {
+    throw new ApiError(
+      'auth',
+      'No API key is configured. Set VITE_API_KEY in frontend/.env.local and restart the dev server.'
+    )
+  }
+
+  let res
+  try {
+    res = await fetch(`${API_BASE}/api/outreach/draft`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new ApiError('network', 'Could not reach the drafting service.')
+  }
+
+  if (!res.ok) {
+    const detail = await detailOf(res)
+    if (res.status === 401) throw new ApiError('auth', detail)
+    if (res.status === 503) throw new ApiError('unconfigured', detail)
+    if (res.status === 400) throw new ApiError('bad_request', detail)
+    throw new ApiError('server', detail || `Draft failed (${res.status}).`)
+  }
+  return res.json()
+}
+
 // Moment analysis is a background job: submit the upload for a job_id, then poll
 // the status endpoint until it is 'complete' or 'failed'.
 
