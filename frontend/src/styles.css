@@ -2,13 +2,27 @@
   --pitch-charcoal: #1c2420;
   --chalk-white: #f3f1ea;
   --turf-green: #3d5a45;
-  --cone-orange: #e2622a;
+  /* Brighter "under the lights" cone-orange (was #e2622a). RGB channels are kept
+     as a separate token so every translucent accent references the same source. */
+  --cone-orange: #f4713a;
+  --cone-orange-rgb: 244, 113, 58;
   --overcast-grey: #8b9490;
 
   /* derived */
   --turf-green-dim: #33493b;
   --turf-line: #4a6a53;
   --charcoal-raised: #232d28;
+
+  /* Fine, desaturated fabric/turf grain (feTurbulence). Layered under surfaces at
+     ~4.5% so it reads as texture, never as visible static. Static image, no motion. */
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+
+  /* Glass-edge lighting for cards: a 1px inner highlight along the top (catching
+     the light) plus a soft outer lift, replacing hard borders. Shadows only --
+     no backdrop-filter blur. */
+  --glass-edge: inset 0 1px 0 rgba(243, 241, 234, 0.09),
+    0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 28px rgba(0, 0, 0, 0.2);
+  --glass-border: 1px solid rgba(243, 241, 234, 0.06);
 
   --font-display: 'Big Shoulders Display', 'Inter', sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
@@ -28,7 +42,8 @@ html {
 
 body {
   margin: 0;
-  background: var(--pitch-charcoal);
+  background-color: var(--pitch-charcoal);
+  background-image: var(--noise);
   color: var(--chalk-white);
   font-family: var(--font-body);
   font-size: 16px;
@@ -64,10 +79,29 @@ a:hover {
   padding: clamp(3rem, 8vw, 7rem) 1.5rem clamp(2.5rem, 6vw, 5rem);
 }
 
+/* Stadium floodlight: a soft, large radial wash sitting roughly behind the
+   headline. Static (no animation) so it never fights the dot-grid load sequence,
+   and it fades out well before the edges so it reads as light, not a circle. */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 55% 55% at 34% 40%,
+    rgba(var(--cone-orange-rgb), 0.1),
+    rgba(var(--cone-orange-rgb), 0.045) 38%,
+    transparent 68%
+  );
+  pointer-events: none;
+}
+
 /* Tactical-whiteboard dot grid, pure CSS. */
 .hero__grid {
   position: absolute;
-  inset: 0;
+  /* Bleed past the hero edges so the cursor-parallax shift never exposes a gap
+     (the hero clips the overflow). Parallax transform is applied via JS. */
+  inset: -24px;
+  transition: transform 0.25s ease-out;
   background-image: radial-gradient(
     circle,
     rgba(243, 241, 234, 0.09) 1.3px,
@@ -77,12 +111,74 @@ a:hover {
   -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 40%, transparent 100%);
   mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 40%, transparent 100%);
   pointer-events: none;
+  /* Signature load moment: the grid resolves out of a slight scatter into perfect
+     alignment once, on page load. Runs alongside the headline entrance below. */
+  animation: grid-settle 0.72s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* A second, offset copy of the same dot field that drifts in and fades to nothing,
+   so the settle reads as two formations converging rather than a flat slide.
+   At rest its opacity is 0, leaving the original single grid untouched. */
+.hero__grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: inherit;
+  background-size: inherit;
+  -webkit-mask: inherit;
+  mask: inherit;
+  animation: grid-ghost 0.72s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes grid-settle {
+  0% {
+    opacity: 0;
+    filter: blur(2px);
+    background-position: 6px -4px;
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    background-position: 0 0;
+  }
+}
+
+@keyframes grid-ghost {
+  0% {
+    opacity: 0.55;
+    background-position: -7px 6px;
+  }
+  100% {
+    opacity: 0;
+    background-position: 0 0;
+  }
 }
 
 .hero__content {
   position: relative;
   max-width: var(--maxw);
   margin: 0 auto;
+}
+
+/* Headline entrance, timed with the grid settling into place. */
+.hero__content > * {
+  animation: hero-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.hero__content > *:nth-child(1) { animation-delay: 0.04s; }
+.hero__content > *:nth-child(2) { animation-delay: 0.12s; }
+.hero__content > *:nth-child(3) { animation-delay: 0.2s; }
+.hero__content > *:nth-child(4) { animation-delay: 0.28s; }
+.hero__content > *:nth-child(5) { animation-delay: 0.36s; }
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .hero__kicker {
@@ -138,12 +234,14 @@ a:hover {
   border: 1px solid var(--turf-line);
   border-radius: 999px;
   color: var(--chalk-white);
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s, transform 0.16s;
 }
 .hero__link:hover {
   text-decoration: none;
   border-color: var(--cone-orange);
-  background: rgba(226, 98, 42, 0.1);
+  background: rgba(var(--cone-orange-rgb), 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(var(--cone-orange-rgb), 0.16);
 }
 
 /* ---------------------------------------------------------------- PAGE */
@@ -199,6 +297,14 @@ a:hover {
 .feature__intro {
   border-left: 3px solid var(--cone-orange);
   padding-left: 1.25rem;
+  /* Scroll-reveal: hidden until IntersectionObserver adds .is-revealed (once). */
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.feature__intro.is-revealed {
+  opacity: 1;
+  transform: none;
 }
 
 /* --------------------------------------------------------- JERSEY BADGE */
@@ -233,7 +339,7 @@ a:hover {
 .jersey-badge.is-active {
   background: var(--cone-orange);
   border-color: var(--chalk-white);
-  box-shadow: inset 0 0 0 2px var(--cone-orange), 0 3px 10px rgba(226, 98, 42, 0.45);
+  box-shadow: inset 0 0 0 2px var(--cone-orange), 0 3px 10px rgba(var(--cone-orange-rgb), 0.45);
 }
 
 /* ------------------------------------------------------------- FORMS */
@@ -241,8 +347,10 @@ a:hover {
 .moments-form {
   display: grid;
   gap: 1.75rem;
-  background: var(--turf-green-dim);
-  border: 1px solid var(--turf-line);
+  background-color: var(--turf-green-dim);
+  background-image: var(--noise);
+  border: var(--glass-border);
+  box-shadow: var(--glass-edge);
   border-radius: var(--radius);
   padding: clamp(1.25rem, 3vw, 2rem);
 }
@@ -275,6 +383,7 @@ a:hover {
   display: flex;
   gap: 0.85rem;
   flex-wrap: wrap;
+  position: relative;
 }
 .badge-button {
   background: transparent;
@@ -282,13 +391,49 @@ a:hover {
   padding: 4px;
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 0.12s;
+  /* Spring easing so a press releases with a small overshoot, not a linear snap.
+     Glow uses drop-shadow (follows the circle) so it never fights the selected ring. */
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.16s ease;
 }
 .badge-button:hover {
   transform: translateY(-2px);
+  filter: drop-shadow(0 3px 9px rgba(var(--cone-orange-rgb), 0.4));
+}
+.badge-button:active {
+  transform: scale(0.95);
 }
 .badge-button.is-selected {
   box-shadow: 0 0 0 2px var(--cone-orange);
+  /* One brief ring pulse the moment a badge becomes selected -- not a loop. */
+  animation: badge-select-pulse 0.3s ease-out;
+}
+@keyframes badge-select-pulse {
+  0% {
+    box-shadow: 0 0 0 2px var(--cone-orange), 0 0 0 0 rgba(var(--cone-orange-rgb), 0.5);
+  }
+  60% {
+    box-shadow: 0 0 0 2px var(--cone-orange), 0 0 0 9px rgba(var(--cone-orange-rgb), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--cone-orange), 0 0 0 0 rgba(var(--cone-orange-rgb), 0);
+  }
+}
+
+/* Thin cone-orange indicator that slides between badges as the selection changes.
+   Positioned in JS (measures the selected button); echoes the dot-grid line work. */
+.badge-connector {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 0;
+  background: var(--cone-orange);
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.24s cubic-bezier(0.4, 0, 0.2, 1), top 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease;
 }
 
 .segmented {
@@ -309,7 +454,7 @@ a:hover {
   transition: background 0.15s;
 }
 .segmented__option:hover {
-  background: rgba(243, 241, 234, 0.06);
+  background: rgba(var(--cone-orange-rgb), 0.12);
 }
 .segmented__option.is-selected {
   background: var(--cone-orange);
@@ -327,9 +472,11 @@ a:hover {
   border-radius: var(--radius);
   padding: 0.75rem 0.9rem;
   cursor: pointer;
+  transition: border-color 0.16s, box-shadow 0.16s;
 }
 .select:hover {
-  border-color: var(--overcast-grey);
+  border-color: var(--cone-orange);
+  box-shadow: 0 0 0 3px rgba(var(--cone-orange-rgb), 0.12);
 }
 
 .pill-row {
@@ -346,10 +493,12 @@ a:hover {
   border-radius: 999px;
   padding: 0.45rem 1rem;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s, transform 0.16s;
 }
 .pill:hover {
-  border-color: var(--overcast-grey);
+  border-color: var(--cone-orange);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(var(--cone-orange-rgb), 0.14);
 }
 .pill.is-selected {
   background: var(--cone-orange);
@@ -420,14 +569,31 @@ a:hover {
   font-weight: 600;
 }
 .notice--regional {
-  background: rgba(226, 98, 42, 0.12);
+  background: rgba(var(--cone-orange-rgb), 0.12);
   border: 1px solid var(--cone-orange);
+  /* Raise into place like a flag going up: drop in, slightly overshoot, settle.
+     Reinforces that the match set just changed to a regional fallback. */
+  animation: region-raise 0.25s ease-out both;
+}
+@keyframes region-raise {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .notice--regional .notice__tag {
   color: var(--cone-orange);
 }
 .notice--error {
-  background: rgba(226, 98, 42, 0.1);
+  background: rgba(var(--cone-orange-rgb), 0.1);
   border: 1px solid var(--cone-orange);
 }
 .notice--error .notice__tag {
@@ -456,10 +622,25 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: var(--turf-green);
-  border: 1px solid var(--turf-line);
+  background-color: var(--turf-green);
+  background-image: var(--noise);
+  border: var(--glass-border);
+  box-shadow: var(--glass-edge);
   border-radius: var(--radius);
   padding: 0.9rem 1.1rem;
+  /* Each row fades and rises in; the per-row delay is set inline (staggered for
+     the first ~10, then revealed together). */
+  animation: card-rise 0.3s ease-out both;
+}
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .player-card__body {
   flex: 1;
@@ -527,15 +708,17 @@ a:hover {
   padding: 2rem 1.5rem;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
 }
 .dropzone:hover {
-  border-color: var(--overcast-grey);
+  border-color: var(--cone-orange);
+  background: rgba(var(--cone-orange-rgb), 0.05);
+  box-shadow: 0 0 0 3px rgba(var(--cone-orange-rgb), 0.1);
 }
 .dropzone.has-file {
   border-style: solid;
   border-color: var(--cone-orange);
-  background: rgba(226, 98, 42, 0.06);
+  background: rgba(var(--cone-orange-rgb), 0.06);
 }
 .dropzone__input {
   position: absolute;
@@ -571,34 +754,44 @@ a:hover {
 
 /* Analyzing state */
 .analyzing {
-  border: 1px solid var(--turf-line);
+  border: var(--glass-border);
+  box-shadow: var(--glass-edge);
   border-radius: var(--radius);
   padding: 2.5rem 1.5rem;
   text-align: center;
 }
+/* A thin scan line sweeping left-to-right, on a loop. Deliberately atmospheric,
+   NOT a progress bar -- it implies "working," never a percentage that isn't real. */
 .analyzing__bar {
-  height: 4px;
+  position: relative;
+  height: 2px;
   width: 100%;
   max-width: 320px;
   margin: 0 auto 1.5rem;
-  background: var(--charcoal-raised);
+  background: rgba(139, 148, 144, 0.18);
   border-radius: 999px;
   overflow: hidden;
 }
 .analyzing__bar span {
-  display: block;
-  height: 100%;
-  width: 40%;
-  background: var(--cone-orange);
-  border-radius: 999px;
-  animation: slide 1.4s ease-in-out infinite;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -25%;
+  width: 25%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cone-orange) 50%,
+    transparent
+  );
+  animation: scan-sweep 1.6s linear infinite;
 }
-@keyframes slide {
+@keyframes scan-sweep {
   0% {
-    transform: translateX(-100%);
+    left: -25%;
   }
   100% {
-    transform: translateX(320%);
+    left: 100%;
   }
 }
 .analyzing__title {
@@ -659,8 +852,10 @@ a:hover {
   gap: 1.25rem;
 }
 .moment-card {
-  background: var(--turf-green);
-  border: 1px solid var(--turf-line);
+  background-color: var(--turf-green);
+  background-image: var(--noise);
+  border: var(--glass-border);
+  box-shadow: var(--glass-edge);
   border-radius: var(--radius);
   padding: 1rem;
 }
@@ -700,6 +895,19 @@ a:hover {
   background: #000;
   display: block;
   max-height: 60vh;
+  /* Hints the browser to tint what it can (scrubber/volume) toward the brand.
+     Honored by the native controls in Chromium/Firefox; ignored by Safari. */
+  accent-color: var(--cone-orange);
+}
+/* Chromium-only: darken the native control panel to match card surfaces. These
+   pseudo-elements do NOT exist in Firefox or Safari -- see the note in the
+   response about what is realistically stylable cross-browser. */
+.moment-card__video::-webkit-media-controls-enclosure {
+  background-color: var(--charcoal-raised);
+  border-radius: 0 0 6px 6px;
+}
+.moment-card__video::-webkit-media-controls-panel {
+  background-color: var(--charcoal-raised);
 }
 .moment-card__noclip {
   color: var(--overcast-grey);
@@ -712,12 +920,31 @@ a:hover {
   padding: 2rem 1.5rem;
   text-align: center;
 }
+.site-footer__rule {
+  width: 48px;
+  height: 2px;
+  margin: 0 auto 1.25rem;
+  background: var(--turf-line);
+  border-radius: 2px;
+}
 .site-footer p {
   color: var(--overcast-grey);
   font-size: 0.8rem;
   margin: 0;
   max-width: var(--maxw);
   margin: 0 auto;
+}
+/* Quiet credit-style link -- muted by default, not a bright CTA. */
+.site-footer__link {
+  display: inline-block;
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+  color: var(--overcast-grey);
+  transition: color 0.16s;
+}
+.site-footer__link:hover {
+  color: var(--chalk-white);
+  text-decoration: none;
 }
 
 /* ------------------------------------------------------------- RESPONSIVE */
@@ -726,6 +953,16 @@ a:hover {
     justify-self: stretch;
     width: 100%;
     text-align: center;
+  }
+  /* Keep all four position badges on one row inside the form at ~375px wide
+     (full-size they overflow and wrap 3+1). Smaller badge + tighter gap fits. */
+  .badge-row {
+    gap: 0.5rem;
+  }
+  .jersey-badge--lg {
+    width: 52px;
+    height: 52px;
+    font-size: 1.25rem;
   }
   .player-card {
     flex-wrap: wrap;
@@ -748,18 +985,36 @@ a:hover {
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
+    /* Reset delays too, or staggered/entrance items would sit hidden through
+       their delay and then pop in sequentially -- worse than no animation. */
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  /* Give the indeterminate bar a static, honest full-width fill instead. */
+  /* Scan line becomes a static, faint full-width line -- no motion, no implied %. */
   .analyzing__bar span {
-    animation: none;
+    animation: none !important;
+    left: 0;
     width: 100%;
-    opacity: 0.6;
+    background: rgba(var(--cone-orange-rgb), 0.4);
   }
+  /* Never leave the scroll-revealed intros in their hidden pre-reveal state. */
+  .feature__intro {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* Disable hover/press LIFTS (motion); glows and color changes are kept. */
   .badge-button:hover,
-  .cta:hover:not(:disabled) {
+  .badge-button:active,
+  .cta:hover:not(:disabled),
+  .hero__link:hover,
+  .pill:hover {
     transform: none;
+  }
+  /* Cursor parallax is JS-driven and not attached under reduced motion, but lock
+     the grid transform to 0 as a belt-and-suspenders guard. */
+  .hero__grid {
+    transform: none !important;
   }
 }
