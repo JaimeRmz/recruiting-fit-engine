@@ -1,9 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Comparator from './components/Comparator.jsx'
 import MomentFinder from './components/MomentFinder.jsx'
+import OutreachAssistant from './components/OutreachAssistant.jsx'
 
 export default function App() {
   const gridRef = useRef(null)
+
+  // Session state shared with the Outreach Assistant (Feature 03). Lifted here so
+  // that section can read results from BOTH features no matter which ran first:
+  //   comparables -> { results, athlete } from the latest Comparator search
+  //   clips       -> [{ url, label }] from the latest Moment-Finder run
+  const [comparables, setComparables] = useState(null)
+  const [clips, setClips] = useState([])
 
   // Subtle cursor parallax: the dot grid drifts a few px opposite the pointer.
   // Fully disabled (no listener) when the user prefers reduced motion.
@@ -46,12 +54,15 @@ export default function App() {
             some of that back to the player: see <strong>real college players</strong> who
             share your position and hometown and the programs they play for, and
             surface the <strong>moments worth reviewing</strong> in your own footage
-            without paying anyone to scrub it.
+            without paying anyone to scrub it — and, if you want it, an assistant that
+            turns that into a first-contact email you can edit and send.
           </p>
           <p className="hero__caveat">
-            Two validated capabilities, shown honestly. Neither predicts your future
-            or scores your ability — they show you real data and real timestamps, and
-            they’re candid about what they can’t do.
+            Two validated capabilities, plus one optional assistant built on top of
+            them. The first two show you real data and real timestamps — they don’t
+            predict your future or score your ability, and they’re candid about what
+            they can’t do. The third turns that into a draft — it never invents a
+            coach’s name, email, or date.
           </p>
           <nav className="hero__nav" aria-label="Jump to a feature">
             <a href="#comparator" className="hero__link">
@@ -60,21 +71,27 @@ export default function App() {
             <a href="#moment-finder" className="hero__link">
               Moment-Finder
             </a>
+            <a href="#outreach" className="hero__link">
+              Outreach Assistant
+            </a>
           </nav>
         </div>
       </header>
 
       <main className="page">
-        <Comparator />
+        <Comparator onResults={setComparables} />
         <div className="section-divider" role="separator" aria-hidden="true" />
-        <MomentFinder />
+        <MomentFinder onClips={setClips} />
+        <div className="section-divider" role="separator" aria-hidden="true" />
+        <OutreachAssistant comparables={comparables} clips={clips} />
       </main>
 
       <footer className="site-footer">
         <div className="site-footer__rule" aria-hidden="true" />
         <p className="mono">
-          Recruiting Fit Engine — a demo of two validated capabilities. No accounts,
-          no tracking, no stored data.
+          Recruiting Fit Engine — a demo of two validated capabilities, plus an
+          optional assistant that turns them into outreach. No accounts, no tracking,
+          no stored data.
         </p>
         <a
           className="site-footer__link mono"

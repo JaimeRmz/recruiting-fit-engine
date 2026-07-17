@@ -33,7 +33,9 @@ function messageFor(err) {
   }
 }
 
-export default function MomentFinder() {
+// onClips lifts completed clip URLs up to App so the Outreach Assistant section
+// can offer them as attachments, regardless of which feature was run first.
+export default function MomentFinder({ onClips = () => {} }) {
   const [file, setFile] = useState(null)
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [data, setData] = useState(null)
@@ -61,6 +63,12 @@ export default function MomentFinder() {
         if (res.status === 'complete') {
           setData(res)
           setStatus('done')
+          // Surface this run's clips to the Outreach Assistant (absolute URLs).
+          onClips(
+            (res.candidates || [])
+              .filter((c) => c.clip_url)
+              .map((c) => ({ url: clipUrl(c.clip_url), label: `#${c.rank} · ${c.timestamp}` }))
+          )
         } else if (res.status === 'failed') {
           setError(res.error || 'Analysis failed on the server. Try a different clip.')
           setStatus('error')

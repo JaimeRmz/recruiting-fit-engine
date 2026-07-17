@@ -678,33 +678,21 @@ a:hover {
 }
 
 /* ------------------------------------------------- OUTREACH ASSISTANT */
+/* Feature 03's card. A neutral glass surface matching the Comparator/Moment-Finder
+   form cards; the section header (eyebrow/title/lede) is the shared .feature__intro,
+   so this is styled like the other two features, not like a nested sub-panel. */
 .outreach {
-  margin-top: 2rem;
   padding: clamp(1.25rem, 3vw, 2rem);
   background-color: var(--turf-green-dim);
   background-image: var(--noise);
   border: var(--glass-border);
   box-shadow: var(--glass-edge);
   border-radius: var(--radius);
-  border-top: 3px solid var(--cone-orange);
 }
-.outreach__intro {
-  margin-bottom: 1.5rem;
-}
-.outreach__title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: -0.005em;
-  font-size: clamp(1.4rem, 3vw, 1.9rem);
-  line-height: 1.05;
-  margin: 0 0 0.6rem;
-}
-.outreach__lede {
-  color: var(--chalk-white);
-  max-width: 60ch;
-  margin: 0;
-  font-size: 0.98rem;
+/* Empty-state jump-back link to the Comparator. */
+.outreach-empty__cta {
+  display: inline-block;
+  margin-top: 1.25rem;
 }
 
 .outreach-form {
