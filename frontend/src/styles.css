@@ -707,6 +707,20 @@ a:hover {
 .outreach-hint strong {
   color: var(--chalk-white);
 }
+/* Compact "about you" fields in browse-all: two columns, one on narrow screens. */
+.field-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.field-grid .select {
+  max-width: 100%;
+}
+@media (max-width: 640px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Text inputs + textareas match the existing .select surface exactly. */
 .text-input,
