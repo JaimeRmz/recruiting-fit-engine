@@ -1,9 +1,8 @@
 """
-Comparator: "here are real players like you, and where they play."
+Comparator: real players sharing a position and home state, and where they play.
 
-No prediction, no score, no confidence. find_comparables() returns real roster
-rows matching a position and home state -- nothing computed, nothing ranked by
-any model.
+No prediction, score, or confidence. find_comparables() returns real roster rows
+matching a position and home state -- nothing computed, nothing model-ranked.
 
     python compare_athletes.py
 """

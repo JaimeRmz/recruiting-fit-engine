@@ -1,21 +1,18 @@
 """
-Build data/all_programs.csv -- a program-LEVEL national soccer directory for the
-Outreach Assistant's "browse all programs" selector.
+Build data/all_programs.csv -- a program-level national soccer directory for the
+Outreach Assistant's browse-all selector.
 
-This is DELIBERATELY separate from data/program_roster_master.csv (the 43-school
-roster the Comparator uses). It carries no player data -- just, per program:
-    school, division (D1/D2/D3/NAIA), conference, state, gender (M/W)
+Separate from data/program_roster_master.csv (the Comparator's roster); no player
+data, just per program: school, division (D1/D2/D3/NAIA), conference, state,
+gender (M/W).
 
-SOURCES (each is soccer-specific -- it lists schools that actually field soccer in
-that division/gender; we never assert sponsorship a source doesn't state):
-  * NCAA D1 & D2, men's & women's:  Wikipedia "List of NCAA Division ... soccer
-    programs" tables. These include conference.
-  * NCAA D3 & NAIA, men's & women's:  ncsasports.org division/NAIA soccer college
-    lists. Wikipedia has NO soccer-specific D3 or NAIA list (only general member-
-    institution lists, which don't say which schools field soccer, so using them
-    would fabricate sponsorship). NCSA's lists ARE soccer-specific. They do not
-    publish conference, so conference is left blank for D3/NAIA rows -- blank, not
-    guessed.
+Sources are soccer-specific (schools that actually field soccer in that
+division/gender):
+  * NCAA D1 & D2:  Wikipedia "List of NCAA Division ... soccer programs" tables,
+    which include conference.
+  * NCAA D3 & NAIA:  ncsasports.org soccer college lists. Wikipedia has no
+    soccer-specific D3/NAIA list. NCSA does not publish conference, so conference
+    is left blank for these rows rather than guessed.
 
 Run:  python build_all_programs.py
 """

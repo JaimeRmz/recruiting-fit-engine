@@ -1,29 +1,21 @@
 """
-Moment-Finder: surface CANDIDATE highlight timestamps in raw soccer footage.
+Moment-Finder: surface candidate highlight timestamps in raw soccer footage.
 
-WHAT THIS DOES
-    Flags moments in a match video that a human editor should LOOK AT, using two
-    content-agnostic signals: hard scene cuts (replays, angle changes) and
-    sustained bursts of on-field motion (sprints, scrambles, celebrations).
+Flags moments a human editor should look at, using two content-agnostic signals:
+hard scene cuts (replays, angle changes) and sustained bursts of on-field motion
+(sprints, scrambles, celebrations).
 
-WHAT THIS DOES NOT DO
-    It does not recognize events. It has no concept of a goal, a foul, a save or
-    a shot, and it never claims one. A candidate is "something moved a lot here"
-    or "the video cut here" -- nothing more. High motion is just as likely to be a
-    goalmouth scramble as a throw-in near a panning camera. The output is a review
-    queue that cuts editing time; it does not replace editing judgment, and a
-    candidate carries no confidence that anything notable happened.
-
-    The ranking is a suggested REVIEW ORDER, not a likelihood. Nothing here is a
-    probability and nothing should be presented to a user as one.
+It does not recognize events -- no concept of a goal, foul, save, or shot. A
+candidate means "something moved a lot here" or "the video cut here", nothing
+more, and carries no confidence that anything notable happened. The output is a
+review queue, and the ranking is a suggested review order, not a probability.
 
 USAGE
     python moment_finder.py match.mp4 --outdir clips/
     python moment_finder.py match.mp4 --motion-percentile 95 --content-threshold 30
 
-Every threshold is a parameter -- see CLI flags -- because sensible values depend
-entirely on the footage (broadcast vs. sideline tripod vs. phone) and are meant to
-be tuned against real video.
+Every threshold is a CLI parameter; sensible values depend on the footage
+(broadcast vs. sideline tripod vs. phone) and are meant to be tuned against it.
 """
 import argparse
 import os
@@ -39,32 +31,23 @@ import numpy as np
 # ---------------------------------------------------------------------------
 # VIDEO ASSUMPTIONS (what to feed this)
 #
-#   Container/codec : anything OpenCV + ffmpeg can decode. H.264 .mp4 is the
-#                     expected case; .mov/.mkv/.avi generally work too.
-#   Resolution      : any. Frames are downscaled to MOTION_WIDTH px wide before
-#                     motion analysis, so 4K costs decode time but not analysis
-#                     time. No minimum resolution is enforced, but below ~480p
-#                     players get small enough that residual motion is noisy.
+#   Container/codec : anything OpenCV + ffmpeg can decode; H.264 .mp4 expected.
+#   Resolution      : any; frames are downscaled before analysis. Below ~480p
+#                     residual motion gets noisy.
 #   Frame rate      : read from the file. Variable-frame-rate video (common from
-#                     phones) will produce drifting timestamps -- transcode VFR to
-#                     constant frame rate first if timings look off.
-#   Content         : one continuous match recording. Broadcast footage with
-#                     existing replays/cuts is fine and is exactly what the scene
-#                     detector is for. Tripod/fixed-camera footage is also fine:
-#                     the camera-motion compensation simply becomes a no-op.
-#   Audio           : ignored entirely. Crowd noise is probably the single
-#                     strongest highlight cue available and this pipeline does not
-#                     use it. That is a known gap, not an oversight.
+#                     phones) drifts timestamps -- transcode to CFR first.
+#   Content         : one continuous match recording. Broadcast replays/cuts feed
+#                     the scene detector; tripod footage makes camera compensation
+#                     a no-op.
+#   Audio           : ignored. Crowd noise is a strong highlight cue this pipeline
+#                     does not use -- a known gap.
 # ---------------------------------------------------------------------------
 
 MOTION_WIDTH = 320          # analysis width in px; motion is scale-invariant enough
 DIFF_PIXEL_THRESH = 25      # per-pixel intensity delta counted as "moved" (0-255)
-# Cap the width of the video actually fed to analysis. Peak memory otherwise scales
-# with the UPLOAD's resolution: a 512MB container holds the Python process AND the
-# ffmpeg subprocess together, and full-res frame decode + PySceneDetect + libx264
-# clip encoding at 4K blows past that. 640px is well above the 320px the motion
-# stage needs and keeps scene-cut detail, while collapsing the footprint to a fixed
-# ceiling no matter what a user uploads.
+# Downscale to 640px before analysis to bound peak memory regardless of input
+# resolution (the 512MB container holds both the Python process and ffmpeg). Well
+# above the 320px the motion stage needs, and keeps scene-cut detail.
 PREPROCESS_MAX_WIDTH = 640
 
 
@@ -100,13 +83,9 @@ def downscale_for_analysis(video_path, ffmpeg, max_width=PREPROCESS_MAX_WIDTH):
     """
     Return a video no wider than `max_width`, transcoding down only if needed.
 
-    This is the memory safety net: every downstream stage (frame decode, scene
-    detection, per-clip re-encoding) then runs at a bounded resolution, so a 4K
-    upload and a 480p upload land at roughly the same footprint. ffmpeg does the
-    downscale in a streaming pass, so the transcode itself stays light too.
-
-    Only ever downscales -- a sub-`max_width` input is returned untouched (it is
-    already cheap, and upscaling would waste work). Returns (path_to_use, is_temp);
+    Memory safety net: every downstream stage then runs at a bounded resolution, so
+    a 4K and a 480p upload land at roughly the same footprint. Only downscales;
+    sub-`max_width` input is returned untouched. Returns (path_to_use, is_temp);
     when is_temp is True the caller owns the temp file and must delete it.
     """
     if not ffmpeg:
@@ -117,11 +96,9 @@ def downscale_for_analysis(video_path, ffmpeg, max_width=PREPROCESS_MAX_WIDTH):
 
     fd, out = tempfile.mkstemp(prefix="mf_scaled_", suffix=".mp4")
     os.close(fd)
-    # -threads 2 on BOTH the decoder (before -i) and encoder (after) is the key
-    # memory bound here: multi-threaded 4K H.264 decode otherwise holds one large
-    # reference frame per thread, and an unbounded auto-thread count on a many-core
-    # host balloons that to gigabytes. Two threads keeps decode buffers small while
-    # still transcoding faster than real time. ultrafast trims encoder lookahead too.
+    # -threads 2 on both decoder (before -i) and encoder (after) bounds memory:
+    # unbounded auto-threading holds one large reference frame per thread and can
+    # balloon 4K decode to gigabytes. Still faster than real time.
     cmd = [ffmpeg, "-y", "-loglevel", "error", "-threads", "2", "-i", str(video_path),
            # scale=W:-2 preserves aspect ratio and forces an even height (libx264).
            "-vf", f"scale={max_width}:-2",
@@ -129,8 +106,8 @@ def downscale_for_analysis(video_path, ffmpeg, max_width=PREPROCESS_MAX_WIDTH):
            "-threads", "2", "-c:a", "aac", "-movflags", "+faststart", out]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(out) or os.path.getsize(out) == 0:
-        # Fall back to the original rather than crash, but say so loudly -- on a
-        # huge input this reintroduces the OOM risk this step exists to remove.
+        # Fall back to the original rather than crash; on a huge input this
+        # reintroduces the OOM risk this step exists to remove.
         print(f"  WARNING: downscale failed ({w}px input), analyzing original: "
               f"{r.stderr.strip()[:160]}")
         _safe_unlink(out)
@@ -153,24 +130,15 @@ def motion_series(video_path, sample_stride=3, progress=True):
     """
     Per-sample on-field motion intensity, with camera panning removed.
 
-    METHOD: frame differencing with global-motion compensation, chosen over dense
-    optical flow (Farneback) for one practical reason and one honest one.
+    Frame differencing with global-motion compensation, over dense optical flow
+    (Farneback) because it runs faster than real time on downscaled greyscale,
+    which makes threshold tuning iterable; dense flow would push a full match into
+    hours. Naive differencing is useless on soccer because the camera pans
+    continuously, so the dominant frame-to-frame translation is estimated with
+    phase correlation and warped out, leaving motion relative to the camera.
 
-      Practical: a 90-minute match is ~160k frames. Dense flow is roughly an order
-      of magnitude slower per frame and would push a full match into hours. Frame
-      differencing on downscaled greyscale runs faster than real time, which is
-      what makes threshold tuning against real footage actually iterable.
-
-      Honest: naive frame differencing is nearly useless on soccer, because the
-      broadcast camera pans almost continuously and a pan lights up every pixel in
-      the frame. So before differencing, the dominant frame-to-frame translation
-      (i.e. the camera move) is estimated with phase correlation and warped out.
-      What remains is motion RELATIVE to the camera -- players running, bodies
-      colliding, a ball crossing the box -- which is the thing we actually want.
-
-    This compensation is translation-only. Camera zooms and rotations are not
-    modelled and will still register as motion; on a hard zoom expect a false
-    positive. Returns (times, scores, meta).
+    Compensation is translation-only: zooms and rotations still register as motion,
+    so expect a false positive on a hard zoom. Returns (times, scores, meta).
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -237,15 +205,11 @@ def motion_bursts(times, scores, fps, sample_stride, percentile=92.0,
     """
     Sustained runs of high motion, not single-frame spikes.
 
-    Scores are smoothed over `smooth_sec` before thresholding, so a one-frame
-    flash (compression artifact, a bird, a lens flare) cannot produce a candidate;
-    motion has to persist for at least `min_burst_sec` to count.
-
-    The threshold is a PERCENTILE of this video's own motion distribution by
-    default, because absolute residual-motion values are not comparable across
-    resolutions, encoders or camera setups -- a fixed constant that works on
-    broadcast footage will fire on everything in a shaky sideline recording.
-    Pass `abs_threshold` to override with a fixed value once you have tuned one.
+    Scores are smoothed over `smooth_sec` before thresholding, and motion must
+    persist for at least `min_burst_sec`, so a one-frame flash can't produce a
+    candidate. The threshold is a percentile of this video's own motion by default,
+    since absolute residual-motion values aren't comparable across resolutions or
+    camera setups. Pass `abs_threshold` to override with a tuned fixed value.
     """
     if len(scores) == 0:
         return []
@@ -286,10 +250,9 @@ def scene_cuts(video_path, content_threshold=27.0, min_scene_sec=1.0):
     """
     Hard cuts via PySceneDetect ContentDetector: replays, angle changes, graphics.
 
-    On a continuous single-camera recording this will legitimately find almost
-    nothing -- that is correct behaviour, not a failure. It earns its keep on
-    broadcast footage, where a director cutting to a replay is itself a strong
-    hint that something worth seeing just happened.
+    A continuous single-camera recording will find almost nothing (correct, not a
+    failure). Earns its keep on broadcast footage, where a cut to a replay hints
+    something worth seeing just happened.
     """
     from scenedetect import ContentDetector, detect
 
@@ -307,14 +270,12 @@ def merge_candidates(bursts, cuts, merge_window=2.0):
     """
     Fold the two signals into one deduplicated, review-ordered list.
 
-    Anything landing within `merge_window` seconds of an existing candidate is
-    merged into it rather than added -- a replay cut fires right after the motion
-    burst that caused it, and those are one moment, not two.
+    Anything within `merge_window` seconds of an existing candidate is merged into
+    it -- a replay cut and the motion burst that caused it are one moment, not two.
 
-    ORDERING is a review heuristic and NOT a score: candidates confirmed by both
-    signals sort first (two independent things noticed the same instant), then by
-    residual motion. `motion_score` is exposed for tuning, not for display to an
-    end user, and it means nothing in absolute terms.
+    Ordering is a review heuristic, not a score: candidates confirmed by both
+    signals sort first, then by residual motion. `motion_score` is for tuning, not
+    display, and means nothing in absolute terms.
     """
     raw = ([Candidate(t, ["motion"], s) for t, s in bursts]
            + [Candidate(t, ["scene_cut"], 0.0) for t in cuts])
@@ -375,9 +336,9 @@ def find_moments(video_path, outdir="clips", content_threshold=27.0,
     print(f"analyzing {video_path}")
     ffmpeg = find_ffmpeg()
 
-    # Memory safety net: run the whole pipeline against a resolution-capped copy so
-    # peak memory never scales with the upload. motion_series, scene_cuts, AND clip
-    # extraction all read `work_path`, so none of them ever touch a full 4K frame.
+    # Run the whole pipeline against a resolution-capped copy so peak memory never
+    # scales with the upload -- motion_series, scene_cuts, and clip extraction all
+    # read `work_path`.
     work_path, is_temp = (
         downscale_for_analysis(video_path, ffmpeg, preprocess_max_width)
         if preprocess else (video_path, False))

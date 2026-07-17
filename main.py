@@ -1,20 +1,18 @@
 """
 Recruiting-Fit-Engine API.
 
-Wraps two validated, content-agnostic tools:
+Wraps two content-agnostic tools:
 
   * find_comparables()  -> real roster rows matching a player's profile.
-  * moment_finder       -> CANDIDATE highlight timestamps in match footage.
+  * moment_finder       -> candidate highlight timestamps in match footage.
 
-Neither predicts, scores, or classifies. The comparables endpoint returns real
-players, not a fit score. The moments pipeline surfaces timestamps for a human to
-review; it does not know what happened at any of them and never claims to. That
-framing is load-bearing and is repeated in the response bodies on purpose -- see
-MOMENT_FINDER_NOTES.
+Neither predicts, scores, or classifies. Comparables returns real players, not a
+fit score. Moments surfaces timestamps for human review; it does not know what
+happened at any of them. That framing is repeated in response bodies on purpose;
+see MOMENT_FINDER_NOTES.
 
-Moment analysis is asynchronous: POST /api/moments/submit accepts the upload and
-returns a job_id immediately; GET /api/moments/status/{job_id} is polled until the
-job is complete or failed.
+Moment analysis is asynchronous: POST /api/moments/submit returns a job_id
+immediately; GET /api/moments/status/{job_id} is polled until complete or failed.
 
 Run:
     uvicorn main:app --reload
@@ -45,63 +43,48 @@ VALID_GENDERS = {"M", "W"}
 VALID_CLASS_YEARS = {"Fr", "So", "Jr", "Sr"}
 
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024        # 500 MB
-# 20-minute cap. Analysis now runs as a BACKGROUND job (see /api/moments/submit),
-# so the request no longer blocks on CPU and a full half is in reach. At the
-# measured Render Starter rate (~1 min processing per ~1.8 min of footage) 20 min
-# of footage is ~11 min of background work; the client submits, gets a job_id back
-# immediately, and polls /api/moments/status/{job_id}.
+# 20-minute cap. Analysis runs as a background job, so the request doesn't block
+# on CPU. At ~1 min processing per ~1.8 min of footage, 20 min is ~11 min of work.
 MAX_DURATION_SEC = 20 * 60                  # 20 minutes
 UPLOAD_CHUNK = 1024 * 1024                  # 1 MB streaming chunks
 CLIP_TTL_SEC = 60 * 60                      # serve extracted clips for 1 hour
 JOB_TTL_SEC = 60 * 60                       # keep finished job results for 1 hour
 
-# One background worker on purpose: uvicorn runs --workers 1 and each CV job peaks
-# a few hundred MB, so serializing jobs keeps the container under its 512MB limit.
-# A second submission uploads and gets a job_id immediately; only its processing
-# queues behind the first. This is deliberately not a real task queue.
+# Single worker: each CV job peaks a few hundred MB, so serializing jobs keeps the
+# container under its 512MB limit. Submissions still get a job_id immediately;
+# only processing queues.
 _EXECUTOR = ThreadPoolExecutor(max_workers=1)
 _JOBS = {}                                  # job_id -> {status, created_at, result|error}
 _JOBS_LOCK = threading.Lock()
 
-# moment_finder's module defaults are still the original pre=3/post=5; the
-# validated tuning from real-footage testing is pre=4.5/post=5 at the 92nd
-# percentile. Pin those here so the API's behavior is explicit and does not drift
-# with the module, rather than relying on the library defaults.
+# Pin the validated tuning here so API behavior doesn't drift with moment_finder's
+# module defaults.
 MOTION_PERCENTILE = 92.0
 CLIP_PRE_SEC = 4.5
 CLIP_POST_SEC = 7.0
 
-# Vite dev server (local) + deployed frontend. The Vercel entry is the stable
-# production domain (per-deploy hash URLs are not covered).
+# Vite dev server + stable production domain (per-deploy hash URLs not covered).
 CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://recruiting-fit-engine.vercel.app",
 ]
 
-# Shared-secret gate for the compute-heavy /api/moments endpoint. Read from the
-# environment; never hardcode. /api/comparables and /api/health stay open.
+# Shared-secret gate for /api/moments and /api/outreach. Read from env, never
+# hardcoded. /api/comparables, /api/programs, and /api/health stay open.
 API_SECRET_KEY = os.environ.get("API_SECRET_KEY")
 
 # Outreach Assistant (/api/outreach/draft) config.
-#
-# COST NOTE: unlike everything else in this app, this endpoint makes a paid
-# Anthropic API call on every request -- it costs real money per draft. It stays
-# behind the same X-API-Key gate as /api/moments, and it must NOT be called in a
-# loop during testing. Model + token budget are deliberately small: a first-
-# contact recruiting email is short prose, so Haiku with a ~500-token cap is
-# plenty (and cheap). Key is read live from the env, same pattern as the others.
+# COST: each request makes a paid Anthropic API call. Gated behind X-API-Key; do
+# not call in a loop. Sonnet over Haiku because Haiku dropped provided facts (the
+# athlete's own reasons) and genericized the email; volume is low so cost is
+# negligible. Key read live from env.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-# Sonnet 5, not Haiku: testing showed Haiku unreliably dropped specific provided
-# facts (the athlete's own reasons for interest) and genericized the email, even
-# with a foregrounded prompt. A first-contact email is short and low-volume, so
-# the stronger model's cost is negligible and the fidelity is worth it.
 OUTREACH_MODEL = "claude-sonnet-5"
 OUTREACH_MAX_TOKENS = 500
 
-# The one instruction that makes this feature honest: it drafts PROSE from given
-# facts, it does not retrieve facts. Everything the athlete didn't supply becomes
-# a bracketed placeholder they must verify -- never an invented name/email/date.
+# Drafts prose from given facts; does not retrieve facts. Anything not supplied
+# becomes a bracketed placeholder, never an invented name/email/date.
 OUTREACH_SYSTEM_PROMPT = """You draft a short, first-contact recruiting email from a high-school soccer player to a college coach.
 
 ABSOLUTE RULES -- never break these:
@@ -158,8 +141,7 @@ Notice how the marine biology program, the serve-receive style, the West-Coast r
 
 Now write ONLY the email itself, for the athlete described in the next message. You may include a subject line as the first line. No preamble, no commentary, no markdown formatting."""
 
-# Known limitations, echoed in every /api/moments response. These are the ceiling
-# of what the tool claims; the frontend should surface them, not bury them.
+# Known limitations, echoed in every /api/moments response for the frontend to surface.
 MOMENT_FINDER_NOTES = [
     "These are CANDIDATE timestamps for human review, not detected events. The "
     "tool does not recognize goals, shots, fouls, or any specific play.",
@@ -169,19 +151,18 @@ MOMENT_FINDER_NOTES = [
     "camera zooms.",
 ]
 
-# Temp roots. Uploads live in a dir that is NEVER served and are deleted right
-# after processing. Clips live in a served dir and are swept on a TTL.
+# Temp roots. Uploads live in a never-served dir and are deleted after processing;
+# clips live in a served dir and are swept on a TTL.
 WORK_ROOT = os.path.join(tempfile.gettempdir(), "rfe_api")
 UPLOAD_DIR = os.path.join(WORK_ROOT, "uploads")
 CLIPS_DIR = os.path.join(WORK_ROOT, "clips")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CLIPS_DIR, exist_ok=True)
 
-# Program-level national directory for the Outreach Assistant's "browse all"
-# selector: school/division/conference/state/gender, ~2,200 real soccer programs.
-# This is SEPARATE from the Comparator's roster file (program_roster_master.csv) and
-# holds no player data. Loaded once at startup and served read-only via /api/programs.
-# See build_all_programs.py for how it's sourced (Wikipedia D1/D2, NCSA D3/NAIA).
+# Program-level national directory for the Outreach Assistant's browse-all selector
+# (school/division/conference/state/gender). Separate from the Comparator's roster;
+# no player data. Loaded once at startup, served read-only via /api/programs. See
+# build_all_programs.py for sourcing.
 PROGRAMS_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "data", "all_programs.csv")
 
@@ -209,21 +190,15 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    # Also allow any localhost / 127.0.0.1 port. The Vite dev server falls back off
-    # 5173 to 5174+ whenever 5173 is busy, which silently changes the browser's
-    # Origin and is the usual cause of a "No Access-Control-Allow-Origin" preflight
-    # failure in local dev. Production origins stay explicit in CORS_ORIGINS above.
-    # Private LAN ranges (10/8, 192.168/16, 172.16-31/12) are allowed too, so the
-    # dev server reached from a phone on the same wifi (e.g. http://192.168.x.x:5173)
-    # isn't blocked. Those origins only exist on a local network, and /api/moments
-    # stays gated by X-API-Key.
+    # Allow any localhost port (Vite falls back off 5173 when busy) and private LAN
+    # ranges (dev server reached from a phone on the same wifi). /api/moments stays
+    # gated by X-API-Key regardless.
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}):\d+",
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],  # wildcard already reflects X-API-Key on the preflight
+    allow_headers=["*"],
 )
-# Extracted clips are served here so the frontend can play them directly.
-# URL shape: /clips/<job_id>/<clip_filename>.mp4
+# Extracted clips served at /clips/<job_id>/<clip_filename>.mp4.
 app.mount("/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
 
 
@@ -275,10 +250,8 @@ class ProgramsResponse(BaseModel):
 
 
 class OutreachRequest(BaseModel):
-    # Already-known athlete data (from the Comparator inputs) + the chosen real
-    # program (from a Comparator result row). Optional fields are exactly that --
-    # anything left blank becomes a bracketed placeholder in the draft, never an
-    # invented fact.
+    # Athlete data plus the chosen program. Optional fields left blank become
+    # bracketed placeholders in the draft, never invented facts.
     position: str = Field(..., description="GK, D, M, F (exact).", examples=["M"])
     hometown_state: str = Field(..., examples=["Texas"])
     gender: str = Field(..., description="M or W (exact).", examples=["W"])
@@ -325,10 +298,8 @@ class MomentJobStatus(BaseModel):
     Polled result of a moment-analysis job.
 
     While running: {"status": "processing"}. On success the candidate fields are
-    populated (same shape the old synchronous endpoint returned, honesty notes
-    included). On failure: {"status": "failed", "error": ...}. At the measured
-    Render rate (~1 min per ~1.8 min of footage) a 20-minute upload is ~11 minutes
-    of work, so poll on the order of every few seconds.
+    populated (honesty notes included). On failure: {"status": "failed", "error":
+    ...}. Poll every few seconds.
     """
     status: str = Field(..., description="'processing', 'complete', or 'failed'.")
     total_candidates: int | None = None
@@ -393,11 +364,10 @@ def _fmt_ts(sec):
 
 
 def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    """Gate for /api/moments. Fails CLOSED: if the server has no API_SECRET_KEY
-    configured, the endpoint is unavailable rather than open. Compared in constant
-    time so a wrong key leaks no timing signal."""
-    # Read live from the env (not just the import-time constant) so the key can be
-    # rotated by restarting the service without a code change.
+    """Gate for /api/moments and /api/outreach. Fails closed: with no
+    API_SECRET_KEY configured the endpoint is unavailable, not open. Constant-time
+    comparison so a wrong key leaks no timing signal."""
+    # Read live from env so the key can be rotated by restarting the service.
     expected = os.environ.get("API_SECRET_KEY") or API_SECRET_KEY
     if not expected:
         raise HTTPException(
@@ -443,19 +413,17 @@ def comparables(req: ComparablesRequest):
 
 @app.get("/api/programs", response_model=ProgramsResponse)
 def programs():
-    """Public program-level national soccer directory for the Outreach Assistant's
-    browse-all selector: school, division, conference, state, gender. Sorted
-    alphabetically by school. No auth -- this is public reference data, and it is
-    SEPARATE from the Comparator's roster (that keeps using its own file)."""
+    """Public national soccer program directory for the browse-all selector: school,
+    division, conference, state, gender. Sorted by school. No auth -- public
+    reference data, separate from the Comparator's roster."""
     return ProgramsResponse(count=len(_PROGRAMS), programs=_PROGRAMS)
 
 
 def _build_outreach_user_message(req: "OutreachRequest") -> str:
-    """Render the provided facts into an explicit, labeled block, FOREGROUNDING the
-    athlete's reason for interest as the email's central theme so the model builds
-    around its specific content instead of genericizing it. Fields the athlete did
-    NOT provide are simply absent here -- the system prompt turns each gap into a
-    bracketed placeholder, never an invention."""
+    """Render the provided facts into a labeled block, foregrounding the reason for
+    interest as the central theme so the model builds around its specifics rather
+    than genericizing. Unprovided fields are absent; the system prompt turns each
+    gap into a bracketed placeholder."""
     pos = {"GK": "goalkeeper", "D": "defender", "M": "midfielder",
            "F": "forward"}.get(req.position.strip().upper(), req.position)
     squad = {"M": "men's", "W": "women's"}.get(req.gender.strip().upper(),
@@ -465,8 +433,8 @@ def _build_outreach_user_message(req: "OutreachRequest") -> str:
     lines = ["Draft a first-contact recruiting email using ONLY the facts below.",
              ""]
 
-    # Foreground the reason FIRST and loudly when provided -- listing it as one
-    # bullet among many led Haiku to weight it equally and flatten it.
+    # Foreground the reason first when provided; listing it among the other bullets
+    # led the model to flatten it.
     if why:
         lines += [
             "CENTRAL THEME of the email -- this is the athlete's own reason for "
@@ -515,10 +483,10 @@ def _build_outreach_user_message(req: "OutreachRequest") -> str:
 @app.post("/api/outreach/draft", response_model=OutreachResponse)
 def outreach_draft(req: OutreachRequest, _auth: None = Depends(require_api_key)):
     """
-    Draft a first-contact recruiting email from the athlete's known facts and a
-    real target program. PROSE GENERATION, not fact retrieval: it never invents a
-    coach name, email, date, or any school-specific fact -- missing details come
-    back as bracketed placeholders the athlete must verify.
+    Draft a first-contact recruiting email from the athlete's facts and a target
+    program. Prose generation, not fact retrieval: never invents a coach name,
+    email, date, or school-specific fact -- missing details come back as bracketed
+    placeholders.
 
     Requires X-API-Key. COST: each call hits the paid Anthropic API. Do not loop.
     """
@@ -548,7 +516,7 @@ def outreach_draft(req: OutreachRequest, _auth: None = Depends(require_api_key))
                        "content": _build_outreach_user_message(req)}],
         )
     except anthropic.APIStatusError as e:
-        # Upstream returned an HTTP error (rate limit, auth, overloaded, ...).
+        # Upstream HTTP error (rate limit, auth, overloaded, ...).
         raise HTTPException(
             status_code=502,
             detail=f"The drafting service returned an error ({e.status_code}). "
@@ -617,10 +585,9 @@ def submit_moments(file: UploadFile = File(...),
     """
     Accept a match video for analysis and return a job_id immediately.
 
-    Requires a valid X-API-Key header. Max 20 minutes / 500 MB per upload. The
-    upload and validation happen here synchronously; the CV work runs in the
-    background. Poll GET /api/moments/status/{job_id} for the result -- at the
-    measured Render rate a 20-minute upload is ~11 minutes of processing.
+    Requires X-API-Key. Max 20 minutes / 500 MB per upload. Upload and validation
+    happen here; the CV work runs in the background. Poll
+    GET /api/moments/status/{job_id} for the result.
     """
     _sweep_expired()
 
@@ -628,8 +595,8 @@ def submit_moments(file: UploadFile = File(...),
     src_path = os.path.join(UPLOAD_DIR, f"{job_id}.mp4")
     job_clips = os.path.join(CLIPS_DIR, job_id)
 
-    # 1. stream to disk, enforcing the size cap mid-stream so we never buffer a
-    #    huge upload fully into memory or onto disk before rejecting it.
+    # 1. stream to disk, enforcing the size cap mid-stream so an oversized upload is
+    #    rejected before it's fully buffered.
     size = 0
     try:
         with open(src_path, "wb") as out:
@@ -682,9 +649,9 @@ def moment_status(job_id: str):
     """
     Poll a submitted job. No auth -- job_ids are unguessable UUIDs.
 
-    'processing' while running; 'complete' with the candidate list (same shape as
-    the old synchronous response, honesty notes included) when done; 'failed' with
-    a message otherwise. Unknown/expired ids return 404 (jobs are kept 1 hour).
+    'processing' while running; 'complete' with the candidate list when done;
+    'failed' with a message otherwise. Unknown/expired ids return 404 (jobs kept
+    1 hour).
     """
     rec = _get_job(job_id)
     if rec is None:

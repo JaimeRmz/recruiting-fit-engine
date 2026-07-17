@@ -11,7 +11,7 @@ const SIGNAL_LABELS = {
   both: 'Motion + cut',
 }
 
-// Maps an ApiError.kind to a message in the interface's voice.
+// Maps an ApiError.kind to a user-facing message.
 function messageFor(err) {
   switch (err.kind) {
     case 'auth':

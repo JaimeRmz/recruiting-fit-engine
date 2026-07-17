@@ -1,12 +1,9 @@
 """
-Measure Moment-Finder RECALL against hand-labeled real moments.
+Measure Moment-Finder recall against hand-labeled real moments.
 
-Moment-Finder is a REVIEW QUEUE, not a classifier. The metric that matters is
-recall: of the moments a human would actually want in a reel, how many did the
-candidate list put within reach? Precision is deliberately NOT optimized -- a
-false positive costs a human a few seconds to skip, while a false negative (a real
-moment the tool never surfaces) is the failure this tool exists to avoid. This
-script reports recall honestly and is explicit about the review burden.
+Recall is the metric that matters for a review queue: how many moments a human
+would want landed within reach. Precision is not optimized -- a false positive
+costs a few seconds to skip, a false negative is a real moment never surfaced.
 
 LABEL FORMAT
     A CSV with a header row `timestamp,description`, then one row per notable

@@ -15,7 +15,7 @@ const GENDERS = [
 ]
 const CLASS_YEARS = ['Fr', 'So', 'Jr', 'Sr']
 
-// Maps an ApiError to a message in the interface's honest voice.
+// Maps an ApiError to a user-facing message.
 function outreachMessage(err) {
   switch (err?.kind) {
     case 'auth':
@@ -32,11 +32,8 @@ function outreachMessage(err) {
   }
 }
 
-// Feature 03. Always rendered, no gate. It's the connective feature: draft a
-// first-contact email for ANY real NCAA/NAIA program (browse-all, standalone) or
-// one of the athlete's Comparator results. The drafting call, fabrication
-// safeguards, and honesty disclaimer are unchanged -- this component owns only
-// layout, which session state it reads, and the browse/results split.
+// Feature 03. Always rendered, no gate. Drafts a first-contact email for any real
+// NCAA/NAIA program (browse-all) or one of the athlete's Comparator results.
 export default function OutreachAssistant({ comparables, clips = [] }) {
   const [introRef, introInView] = useInView()
   return (

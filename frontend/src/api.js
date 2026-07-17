@@ -12,7 +12,7 @@ export function clipUrl(path) {
   return path.startsWith('http') ? path : `${API_BASE}${path}`
 }
 
-// Distinguishes error kinds so the UI can speak in its own voice per case.
+// Carries an error kind so callers can render a message per case.
 export class ApiError extends Error {
   constructor(kind, message) {
     super(message)
@@ -53,8 +53,8 @@ export async function getComparables({ position, hometown_state, gender, class_y
 }
 
 // POST /api/outreach/draft -> { draft }
-// Requires the X-API-Key secret (same as moments). NOTE: each call is a real,
-// paid LLM request server-side -- the UI should not call this in a loop.
+// Requires the X-API-Key secret. Each call is a paid LLM request server-side; do
+// not call in a loop.
 export async function draftOutreach(payload) {
   if (!API_KEY || API_KEY === 'your-api-key-here') {
     throw new ApiError(
