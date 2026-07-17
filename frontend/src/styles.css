@@ -699,6 +699,14 @@ a:hover {
   display: grid;
   gap: 1.25rem;
 }
+.outreach-hint {
+  margin: 0;
+  color: var(--overcast-grey);
+  font-size: 0.9rem;
+}
+.outreach-hint strong {
+  color: var(--chalk-white);
+}
 
 /* Text inputs + textareas match the existing .select surface exactly. */
 .text-input,

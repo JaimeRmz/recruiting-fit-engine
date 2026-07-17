@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { draftOutreach } from '../api.js'
+import { useEffect, useMemo, useState } from 'react'
+import { draftOutreach, getPrograms } from '../api.js'
 import { useInView } from '../hooks/useInView.js'
 
 // Maps an ApiError to a message in the interface's honest voice.
@@ -38,10 +38,11 @@ export default function OutreachAssistant({ comparables, clips = [] }) {
         </h2>
         <p className="feature__lede">
           <strong>Optional</strong>, and it’s the piece that connects the other
-          two: pick a real program from your Comparator results, optionally attach
-          a Moment-Finder clip, and get a first-contact email draft you can edit.
-          It writes from what you enter — it never looks up or invents a coach’s
-          name, email, or dates.
+          two: pick a program — one of your Comparator results, or any of the
+          <strong> real NCAA &amp; NAIA soccer programs</strong> nationwide —
+          optionally attach a Moment-Finder clip, and get a first-contact email
+          draft you can edit. It writes from what you enter; it never looks up or
+          invents a coach’s name, email, or dates.
         </p>
       </div>
 
@@ -84,6 +85,7 @@ function OutreachForm({ comparables, clips }) {
     return [...seen.values()]
   }, [results])
 
+  const [source, setSource] = useState('results') // 'results' | 'browse'
   const [programKey, setProgramKey] = useState(
     `${programs[0].school}|${programs[0].division}`
   )
@@ -96,11 +98,58 @@ function OutreachForm({ comparables, clips }) {
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const program =
+  // Browse-all: the national directory, lazy-loaded the first time the user
+  // switches to "browse". Filtered to the athlete's gender, then narrowed by
+  // state -> school so the picker never renders a 1,000-item list.
+  const [allPrograms, setAllPrograms] = useState(null)
+  const [browseStatus, setBrowseStatus] = useState('idle') // idle|loading|ready|error
+  const [browseError, setBrowseError] = useState(null)
+  const [browseState, setBrowseState] = useState('')
+  const [browseKey, setBrowseKey] = useState('')
+
+  useEffect(() => {
+    if (source !== 'browse' || allPrograms || browseStatus === 'loading') return
+    setBrowseStatus('loading')
+    setBrowseError(null)
+    getPrograms()
+      .then((res) => {
+        setAllPrograms(res.programs)
+        setBrowseStatus('ready')
+      })
+      .catch((err) => {
+        setBrowseError(outreachMessage(err))
+        setBrowseStatus('error')
+      })
+  }, [source, allPrograms, browseStatus])
+
+  const genderLabel = athlete.gender === 'W' ? "women's" : "men's"
+  const genderPrograms = useMemo(
+    () => (allPrograms || []).filter((p) => p.gender === athlete.gender),
+    [allPrograms, athlete.gender]
+  )
+  const browseStates = useMemo(
+    () => [...new Set(genderPrograms.map((p) => p.state).filter(Boolean))].sort(),
+    [genderPrograms]
+  )
+  const stateSchools = useMemo(
+    () =>
+      genderPrograms
+        .filter((p) => p.state === browseState)
+        .sort((a, b) => a.school.localeCompare(b.school)),
+    [genderPrograms, browseState]
+  )
+
+  const resultProgram =
     programs.find((p) => `${p.school}|${p.division}` === programKey) || programs[0]
+  const browseProgram =
+    stateSchools.find((p) => `${p.school}|${p.division}` === browseKey) || null
+  // The program the draft will use. In browse mode it can be null until a school
+  // is picked, which disables the submit button (no drafting without a program).
+  const program = source === 'browse' ? browseProgram : resultProgram
 
   async function onDraft(e) {
     e.preventDefault()
+    if (!program) return // no program selected (browse mode, nothing picked yet)
     setStatus('loading')
     setError(null)
     setCopied(false)
@@ -138,23 +187,107 @@ function OutreachForm({ comparables, clips }) {
   return (
     <>
       <form className="outreach-form" onSubmit={onDraft}>
-        <div className="field">
-          <label className="field__label" htmlFor="outreach-program">
-            Program (from your results)
-          </label>
-          <select
-            id="outreach-program"
-            className="select"
-            value={programKey}
-            onChange={(e) => setProgramKey(e.target.value)}
-          >
-            {programs.map((p) => (
-              <option key={`${p.school}|${p.division}`} value={`${p.school}|${p.division}`}>
-                {p.school} ({p.division})
-              </option>
-            ))}
-          </select>
-        </div>
+        <fieldset className="field">
+          <legend className="field__label">Which program?</legend>
+          <div className="segmented" role="group" aria-label="Choose a program source">
+            <button
+              type="button"
+              className={`segmented__option ${source === 'results' ? 'is-selected' : ''}`}
+              aria-pressed={source === 'results'}
+              onClick={() => setSource('results')}
+            >
+              From my results
+            </button>
+            <button
+              type="button"
+              className={`segmented__option ${source === 'browse' ? 'is-selected' : ''}`}
+              aria-pressed={source === 'browse'}
+              onClick={() => setSource('browse')}
+            >
+              Browse all programs
+            </button>
+          </div>
+        </fieldset>
+
+        {source === 'results' ? (
+          <div className="field">
+            <label className="field__label" htmlFor="outreach-program">
+              Program (from your Comparator results)
+            </label>
+            <select
+              id="outreach-program"
+              className="select"
+              value={programKey}
+              onChange={(e) => setProgramKey(e.target.value)}
+            >
+              {programs.map((p) => (
+                <option key={`${p.school}|${p.division}`} value={`${p.school}|${p.division}`}>
+                  {p.school} ({p.division})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : browseStatus === 'loading' ? (
+          <p className="outreach-hint">Loading the national program list…</p>
+        ) : browseStatus === 'error' ? (
+          <div className="notice notice--error" role="alert">
+            <span className="notice__tag">Couldn’t load programs</span>
+            <p>{browseError}</p>
+          </div>
+        ) : (
+          <>
+            <p className="outreach-hint">
+              Browsing the <strong>{genderPrograms.length.toLocaleString()}</strong>{' '}
+              {genderLabel} NCAA &amp; NAIA programs nationwide. Pick a state, then a
+              school.
+            </p>
+            <div className="field">
+              <label className="field__label" htmlFor="outreach-browse-state">
+                State
+              </label>
+              <select
+                id="outreach-browse-state"
+                className="select"
+                value={browseState}
+                onChange={(e) => {
+                  setBrowseState(e.target.value)
+                  setBrowseKey('')
+                }}
+              >
+                <option value="">Choose a state…</option>
+                {browseStates.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {browseState && (
+              <div className="field">
+                <label className="field__label" htmlFor="outreach-browse-school">
+                  Program{' '}
+                  <span className="field__optional">
+                    ({stateSchools.length} in {browseState})
+                  </span>
+                </label>
+                <select
+                  id="outreach-browse-school"
+                  className="select"
+                  value={browseKey}
+                  onChange={(e) => setBrowseKey(e.target.value)}
+                >
+                  <option value="">Choose a school…</option>
+                  {stateSchools.map((p) => (
+                    <option key={`${p.school}|${p.division}`} value={`${p.school}|${p.division}`}>
+                      {p.school} ({p.division}
+                      {p.conference ? `, ${p.conference}` : ''})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </>
+        )}
 
         <div className="field">
           <label className="field__label" htmlFor="outreach-gpa">
@@ -224,7 +357,7 @@ function OutreachForm({ comparables, clips }) {
           />
         </div>
 
-        <button type="submit" className="cta" disabled={status === 'loading'}>
+        <button type="submit" className="cta" disabled={!program || status === 'loading'}>
           {status === 'loading' ? 'Drafting…' : 'Draft outreach email'}
         </button>
       </form>

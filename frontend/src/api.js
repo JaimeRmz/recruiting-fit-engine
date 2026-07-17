@@ -84,6 +84,22 @@ export async function draftOutreach(payload) {
   return res.json()
 }
 
+// GET /api/programs -> { count, programs: [{school, division, conference, state, gender}] }
+// Public (no auth). The national browse-all directory for the Outreach Assistant.
+export async function getPrograms() {
+  let res
+  try {
+    res = await fetch(`${API_BASE}/api/programs`)
+  } catch {
+    throw new ApiError('network', 'Could not reach the program directory.')
+  }
+  if (!res.ok) {
+    const detail = await detailOf(res)
+    throw new ApiError('server', detail || `Program list failed (${res.status}).`)
+  }
+  return res.json()
+}
+
 // Moment analysis is a background job: submit the upload for a job_id, then poll
 // the status endpoint until it is 'complete' or 'failed'.
 
