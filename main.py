@@ -19,6 +19,7 @@ job is complete or failed.
 Run:
     uvicorn main:app --reload
 """
+import csv
 import hmac
 import os
 import shutil
@@ -176,6 +177,29 @@ CLIPS_DIR = os.path.join(WORK_ROOT, "clips")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CLIPS_DIR, exist_ok=True)
 
+# Program-level national directory for the Outreach Assistant's "browse all"
+# selector: school/division/conference/state/gender, ~2,200 real soccer programs.
+# This is SEPARATE from the Comparator's roster file (program_roster_master.csv) and
+# holds no player data. Loaded once at startup and served read-only via /api/programs.
+# See build_all_programs.py for how it's sourced (Wikipedia D1/D2, NCSA D3/NAIA).
+PROGRAMS_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "data", "all_programs.csv")
+
+
+def _load_programs():
+    fields = ["school", "division", "conference", "state", "gender"]
+    try:
+        with open(PROGRAMS_CSV, newline="", encoding="utf-8") as fh:
+            rows = [{k: (r.get(k) or "").strip() for k in fields}
+                    for r in csv.DictReader(fh)]
+    except FileNotFoundError:
+        return []
+    rows.sort(key=lambda r: r["school"].lower())   # alphabetical by school
+    return rows
+
+
+_PROGRAMS = _load_programs()
+
 app = FastAPI(
     title="Recruiting-Fit-Engine API",
     description="Comparables lookup + candidate highlight-moment finder. "
@@ -234,6 +258,20 @@ class ComparablesResponse(BaseModel):
         None, description="Overall match basis: 'state', 'region', or null if "
         "no matches. On 'region', results are NOT from the requested state.")
     results: list[ComparablePlayer]
+
+
+class Program(BaseModel):
+    school: str
+    division: str = Field(..., description="D1, D2, D3, or NAIA.")
+    conference: str = Field("", description="Blank for D3/NAIA (source has no "
+                            "conference; left blank rather than guessed).")
+    state: str
+    gender: str = Field(..., description="M or W.")
+
+
+class ProgramsResponse(BaseModel):
+    count: int
+    programs: list[Program]
 
 
 class OutreachRequest(BaseModel):
@@ -401,6 +439,15 @@ def comparables(req: ComparablesRequest):
         match_type=rows[0]["match_type"] if rows else None,
         results=rows,
     )
+
+
+@app.get("/api/programs", response_model=ProgramsResponse)
+def programs():
+    """Public program-level national soccer directory for the Outreach Assistant's
+    browse-all selector: school, division, conference, state, gender. Sorted
+    alphabetically by school. No auth -- this is public reference data, and it is
+    SEPARATE from the Comparator's roster (that keeps using its own file)."""
+    return ProgramsResponse(count=len(_PROGRAMS), programs=_PROGRAMS)
 
 
 def _build_outreach_user_message(req: "OutreachRequest") -> str:
