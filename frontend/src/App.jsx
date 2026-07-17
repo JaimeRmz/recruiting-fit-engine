@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import Comparator from './components/Comparator.jsx'
 import MomentFinder from './components/MomentFinder.jsx'
 import OutreachAssistant from './components/OutreachAssistant.jsx'
+import photo1 from './photos/1.jpeg'
+import photo2 from './photos/2.jpg'
+import photo3 from './photos/3.jpg'
+import photo4 from './photos/4.webp'
+
+const HERO_PHOTOS = [photo1, photo2, photo3, photo4]
 
 export default function App() {
   const gridRef = useRef(null)
@@ -43,6 +49,19 @@ export default function App() {
     <>
       <header className="hero">
         <div ref={gridRef} className="hero__grid" aria-hidden="true" />
+        <div className="hero__photos" aria-hidden="true">
+          {HERO_PHOTOS.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt=""
+              className="hero__photo"
+              loading={i === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+              style={{ animationDelay: `${i * 7.25}s` }}
+            />
+          ))}
+        </div>
         <div className="hero__content">
           <p className="hero__kicker">Recruiting Fit Engine</p>
           <h1 className="hero__title">

@@ -154,8 +154,64 @@ a:hover {
   }
 }
 
+/* Ambient photo treatment on the hero's right. Right-aligned to the content
+   column, masked so every edge fades into the pitch-charcoal rather than showing a
+   hard rectangle, and darkened/desaturated so it reads as part of the dark palette
+   behind the text. Sits below all text (z-index) and is hidden on narrow viewports. */
+.hero__photos {
+  position: absolute;
+  z-index: 1;
+  top: clamp(3rem, 8vw, 6.5rem);
+  /* Align the right edge to the centered content column; fall back to the hero
+     padding when the viewport is narrower than the column. */
+  right: max(1.5rem, calc(50% - var(--maxw) / 2));
+  width: min(38vw, 430px);
+  height: clamp(340px, 50vh, 540px);
+  pointer-events: none;
+  /* Feather all four edges: strong fade on the left toward the text, gentle on the
+     right, soft top/bottom. Intersect of a horizontal and a vertical gradient. */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, #000 42%, #000 88%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image:
+    linear-gradient(to right, transparent 0%, #000 42%, #000 88%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.hero__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  /* Read as part of the dark palette, not a bright image competing with the hero. */
+  filter: grayscale(0.7) brightness(0.6) contrast(0.95) saturate(0.85);
+  /* Slow ambient crossfade: 4 images, ~5.5s visible + ~1.75s fade, 29s loop.
+     Per-image start is staggered by 7.25s via an inline animation-delay. */
+  animation: hero-photo-fade 29s linear infinite;
+}
+
+@keyframes hero-photo-fade {
+  0% { opacity: 0; }
+  6% { opacity: 1; }
+  25% { opacity: 1; }
+  31% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Hide on tablet/mobile rather than reflowing into a cramped layout. */
+@media (max-width: 1023px) {
+  .hero__photos {
+    display: none;
+  }
+}
+
 .hero__content {
   position: relative;
+  z-index: 2;
   max-width: var(--maxw);
   margin: 0 auto;
 }
@@ -1156,5 +1212,14 @@ a:hover {
      the grid transform to 0 as a belt-and-suspenders guard. */
   .hero__grid {
     transform: none !important;
+  }
+  /* Freeze the hero photos on the first image; no crossfade. (Without this the
+     global animation reset would run the fade to its hidden end state.) */
+  .hero__photo {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .hero__photo:first-child {
+    opacity: 1 !important;
   }
 }
