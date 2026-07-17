@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { submitMoments, getMomentStatus, clipUrl } from '../api.js'
+import { useInView } from '../hooks/useInView.js'
 import JerseyBadge from './JerseyBadge.jsx'
 
 const POLL_INTERVAL_MS = 4000
@@ -38,6 +39,8 @@ export default function MomentFinder() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
+
+  const [introRef, introInView] = useInView()
 
   // Polling control. runId invalidates a stale poll loop when the user resubmits
   // or the component unmounts, so we never keep hitting the endpoint after done.
@@ -93,7 +96,7 @@ export default function MomentFinder() {
 
   return (
     <section className="feature" id="moment-finder" aria-labelledby="moments-heading">
-      <div className="feature__intro">
+      <div ref={introRef} className={`feature__intro ${introInView ? 'is-revealed' : ''}`}>
         <p className="eyebrow">Feature 02 — Moment-Finder</p>
         <h2 id="moments-heading" className="feature__title">
           Find the moments worth reviewing

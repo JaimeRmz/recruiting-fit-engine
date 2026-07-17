@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { getComparables } from '../api.js'
 import { US_STATES } from '../states.js'
+import { useInView } from '../hooks/useInView.js'
 import JerseyBadge from './JerseyBadge.jsx'
 
 const POSITIONS = ['GK', 'D', 'M', 'F']
@@ -25,6 +26,31 @@ export default function Comparator() {
 
   const canSubmit = position && gender && state
 
+  const [introRef, introInView] = useInView()
+
+  // Slide a thin indicator to the selected position badge. Measures the actual
+  // button geometry so it stays correct when the row wraps or the page resizes.
+  const btnRefs = useRef({})
+  const connectorRef = useRef(null)
+  useLayoutEffect(() => {
+    function place() {
+      const line = connectorRef.current
+      if (!line) return
+      const btn = position ? btnRefs.current[position] : null
+      if (!btn) {
+        line.style.opacity = '0'
+        return
+      }
+      line.style.width = `${btn.offsetWidth}px`
+      line.style.transform = `translateX(${btn.offsetLeft}px)`
+      line.style.top = `${btn.offsetTop + btn.offsetHeight + 6}px`
+      line.style.opacity = '1'
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [position])
+
   async function onSubmit(e) {
     e.preventDefault()
     if (!canSubmit) return
@@ -48,7 +74,7 @@ export default function Comparator() {
 
   return (
     <section className="feature" id="comparator" aria-labelledby="comparator-heading">
-      <div className="feature__intro">
+      <div ref={introRef} className={`feature__intro ${introInView ? 'is-revealed' : ''}`}>
         <p className="eyebrow">Feature 01 — Comparator</p>
         <h2 id="comparator-heading" className="feature__title">
           Real players like you
@@ -68,6 +94,7 @@ export default function Comparator() {
               <button
                 type="button"
                 key={p}
+                ref={(el) => (btnRefs.current[p] = el)}
                 className={`badge-button ${position === p ? 'is-selected' : ''}`}
                 aria-pressed={position === p}
                 onClick={() => setPosition(p)}
@@ -75,6 +102,7 @@ export default function Comparator() {
                 <JerseyBadge position={p} size="lg" active={position === p} />
               </button>
             ))}
+            <span className="badge-connector" ref={connectorRef} aria-hidden="true" />
           </div>
         </fieldset>
 
@@ -209,7 +237,13 @@ function Results({ data, position }) {
 
       <ul className="player-list">
         {data.results.map((p, i) => (
-          <li className="player-card" key={`${p.school}-${p.hometown}-${i}`}>
+          <li
+            className="player-card"
+            key={`${p.school}-${p.hometown}-${i}`}
+            // Stagger only the first ~10 rows; the rest share one delay and reveal
+            // together, so long lists don't cascade for seconds.
+            style={{ animationDelay: `${Math.min(i, 9) * 0.06}s` }}
+          >
             <JerseyBadge position={position} size="md" />
             <div className="player-card__body">
               <p className="player-card__school">{p.school}</p>
