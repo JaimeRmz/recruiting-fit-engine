@@ -89,9 +89,9 @@ export default function App() {
       <footer className="site-footer">
         <div className="site-footer__rule" aria-hidden="true" />
         <p className="mono">
-          Recruiting Fit Engine — a demo of two validated capabilities, plus an
-          optional assistant that turns them into outreach. No accounts, no tracking,
-          no stored data.
+          Recruiting Fit Engine — two tools I tested until I trusted them, plus a
+          helper that turns the results into outreach. No accounts, no tracking,
+          nothing stored.
         </p>
         <a
           className="site-footer__link mono"

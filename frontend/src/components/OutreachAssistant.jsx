@@ -47,12 +47,11 @@ export default function OutreachAssistant({ comparables, clips = [] }) {
           Draft the first email
         </h2>
         <p className="feature__lede">
-          <strong>Optional</strong>, and it’s the piece that connects the other two:
-          pick any program — browse every real <strong>NCAA &amp; NAIA soccer program</strong>{' '}
-          in the country, or one of your Comparator results — tell us a bit about
-          yourself, optionally attach a Moment-Finder clip, and get a first-contact
-          email draft you can edit. It writes from what you enter; it never looks up
-          or invents a coach’s name, email, or dates.
+          <strong>Optional</strong> — but it’s the piece that ties the other two
+          together. Pick a program, from the full list or from your results above.
+          Tell it a little about yourself, add a clip if you’ve got one, and it
+          drafts a first email you can edit before you send it. It only writes from
+          what you give it — it won’t guess a coach’s name, an email, or a date.
         </p>
       </div>
 
