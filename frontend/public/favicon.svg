@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Recruiting Fit Engine">
+  <circle cx="32" cy="32" r="30" fill="#1c2420" stroke="#f4713a" stroke-width="3" />
+  <text x="32" y="34" text-anchor="middle" dominant-baseline="central"
+        font-family="'Arial Black', Arial, Helvetica, sans-serif" font-weight="800"
+        font-size="19" letter-spacing="-1.2" fill="#f4713a">RFE</text>
+</svg>

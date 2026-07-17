@@ -1,11 +1,40 @@
+import { useEffect, useRef } from 'react'
 import Comparator from './components/Comparator.jsx'
 import MomentFinder from './components/MomentFinder.jsx'
 
 export default function App() {
+  const gridRef = useRef(null)
+
+  // Subtle cursor parallax: the dot grid drifts a few px opposite the pointer.
+  // Fully disabled (no listener) when the user prefers reduced motion.
+  useEffect(() => {
+    const grid = gridRef.current
+    const hero = grid?.parentElement
+    if (!grid || !hero) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const MAX = 10 // px of travel at the hero edges
+    function onMove(e) {
+      const r = hero.getBoundingClientRect()
+      const dx = (e.clientX - (r.left + r.width / 2)) / r.width // -0.5..0.5
+      const dy = (e.clientY - (r.top + r.height / 2)) / r.height
+      grid.style.transform = `translate(${-dx * MAX}px, ${-dy * MAX}px)`
+    }
+    function reset() {
+      grid.style.transform = 'translate(0px, 0px)'
+    }
+    hero.addEventListener('mousemove', onMove)
+    hero.addEventListener('mouseleave', reset)
+    return () => {
+      hero.removeEventListener('mousemove', onMove)
+      hero.removeEventListener('mouseleave', reset)
+    }
+  }, [])
+
   return (
     <>
       <header className="hero">
-        <div className="hero__grid" aria-hidden="true" />
+        <div ref={gridRef} className="hero__grid" aria-hidden="true" />
         <div className="hero__content">
           <p className="hero__kicker">Recruiting Fit Engine</p>
           <h1 className="hero__title">
@@ -42,10 +71,19 @@ export default function App() {
       </main>
 
       <footer className="site-footer">
+        <div className="site-footer__rule" aria-hidden="true" />
         <p className="mono">
           Recruiting Fit Engine — a demo of two validated capabilities. No accounts,
           no tracking, no stored data.
         </p>
+        <a
+          className="site-footer__link mono"
+          href="https://github.com/JaimeRmz/recruiting-fit-engine"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View source on GitHub ↗
+        </a>
       </footer>
     </>
   )
