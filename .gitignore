@@ -3,3 +3,5 @@ data/test-footage/
 __pycache__/
 *.pyc
 .env
+
+.claude/
