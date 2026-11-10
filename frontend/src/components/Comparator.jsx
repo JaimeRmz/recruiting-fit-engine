@@ -5,6 +5,8 @@ import { useInView } from '../hooks/useInView.js'
 import JerseyBadge from './JerseyBadge.jsx'
 
 const POSITIONS = ['GK', 'D', 'M', 'F']
+// Mirrors --stagger-step (150ms) in styles.css.
+const STAGGER_STEP_S = 0.15
 const GENDERS = [
   { value: 'M', label: "Men's" },
   { value: 'W', label: "Women's" },
@@ -87,7 +89,8 @@ export default function Comparator({ onResults = () => {} }) {
   }
 
   return (
-    <section className="feature" id="comparator" aria-labelledby="comparator-heading">
+    <section className="feature feature--light" id="comparator" aria-labelledby="comparator-heading">
+      <div className="feature__inner">
       <div ref={introRef} className={`feature__intro ${introInView ? 'is-revealed' : ''}`}>
         <p className="eyebrow">Feature 01 — Comparator</p>
         <h2 id="comparator-heading" className="feature__title">
@@ -214,6 +217,7 @@ export default function Comparator({ onResults = () => {} }) {
           <Results data={data} position={queryPosition} />
         )}
       </div>
+      </div>
     </section>
   )
 }
@@ -258,7 +262,7 @@ function Results({ data, position }) {
             key={`${p.school}-${p.hometown}-${i}`}
             // Stagger only the first ~10 rows; the rest share one delay and reveal
             // together, so long lists don't cascade for seconds.
-            style={{ animationDelay: `${Math.min(i, 9) * 0.06}s` }}
+            style={{ animationDelay: `${Math.min(i, 9) * STAGGER_STEP_S}s` }}
           >
             <JerseyBadge position={position} size="md" />
             <div className="player-card__body">

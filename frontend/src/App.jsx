@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Header from './components/Header.jsx'
 import Comparator from './components/Comparator.jsx'
 import MomentFinder from './components/MomentFinder.jsx'
 import OutreachAssistant from './components/OutreachAssistant.jsx'
@@ -8,6 +9,17 @@ import photo3 from './photos/3.jpg'
 import photo4 from './photos/4.webp'
 
 const HERO_PHOTOS = [photo1, photo2, photo3, photo4]
+
+const STATS = [
+  { number: '2,062', label: 'Real players' },
+  { number: '43', label: 'Schools scraped' },
+  { number: '2,244', label: 'Programs nationwide' },
+]
+
+// Shared "TechFootball Recruiting" red wordmark+monogram (red-only version --
+// served from public/, not bundled, same as favicon.svg).
+const TECHFOOTBALL_LOGO = '/techfootballrecruitinglogored.png'
+const TECHFOOTBALL_URL = 'https://techfootball.vercel.app/'
 
 export default function App() {
   const gridRef = useRef(null)
@@ -47,7 +59,8 @@ export default function App() {
 
   return (
     <>
-      <header className="hero">
+      <Header />
+      <section id="top" className="hero">
         <div ref={gridRef} className="hero__grid" aria-hidden="true" />
         <div className="hero__photos" aria-hidden="true">
           {HERO_PHOTOS.map((src, i) => (
@@ -63,7 +76,6 @@ export default function App() {
           ))}
         </div>
         <div className="hero__content">
-          <p className="hero__kicker">Recruiting Fit Engine</p>
           <h1 className="hero__title">
             The recruiting edge is mostly access. This narrows the gap.
           </h1>
@@ -83,25 +95,29 @@ export default function App() {
             they can’t do. The third turns that into a draft — it never invents a
             coach’s name, email, or date.
           </p>
-          <nav className="hero__nav" aria-label="Jump to a feature">
-            <a href="#comparator" className="hero__link">
-              Comparator
-            </a>
-            <a href="#moment-finder" className="hero__link">
-              Moment-Finder
-            </a>
-            <a href="#outreach" className="hero__link">
-              Outreach Assistant
-            </a>
-          </nav>
         </div>
-      </header>
+      </section>
 
-      <main className="page">
+      <section className="stats" aria-labelledby="stats-heading">
+        <div className="stats__inner">
+          <h2 id="stats-heading" className="stats__heading">
+            Performance Metrics
+          </h2>
+          <div className="stats__grid">
+            {STATS.map((s) => (
+              <div className="stat" key={s.label}>
+                <span className="stat__dot" aria-hidden="true" />
+                <p className="stat__number mono">{s.number}</p>
+                <p className="stat__label">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <main>
         <Comparator onResults={setComparables} />
-        <div className="section-divider" role="separator" aria-hidden="true" />
         <MomentFinder onClips={setClips} />
-        <div className="section-divider" role="separator" aria-hidden="true" />
         <OutreachAssistant comparables={comparables} clips={clips} />
       </main>
 
@@ -119,6 +135,21 @@ export default function App() {
           rel="noopener noreferrer"
         >
           View source on GitHub ↗
+        </a>
+        <a
+          className="site-footer__link site-footer__credit"
+          href={TECHFOOTBALL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src={TECHFOOTBALL_LOGO}
+            alt="TechFootball Recruiting"
+            width="150"
+            height="84"
+            loading="lazy"
+            className="site-footer__logo"
+          />
         </a>
       </footer>
     </>

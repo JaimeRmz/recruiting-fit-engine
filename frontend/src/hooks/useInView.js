@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 // Reveal-once helper: returns [ref, inView]. Sets inView to true the first time
 // the element scrolls into view, then stops observing (never re-animates on
 // scroll-back). Purely presentational -- drives a CSS class, no data logic.
-export function useInView({ threshold = 0.15, rootMargin = '0px 0px -10% 0px' } = {}) {
+export function useInView({ threshold = 0.1, rootMargin = '0px 0px -100px 0px' } = {}) {
   const ref = useRef(null)
   const [inView, setInView] = useState(false)
 

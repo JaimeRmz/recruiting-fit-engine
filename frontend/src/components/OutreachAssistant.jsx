@@ -37,23 +37,25 @@ function outreachMessage(err) {
 export default function OutreachAssistant({ comparables, clips = [] }) {
   const [introRef, introInView] = useInView()
   return (
-    <section className="feature" id="outreach" aria-labelledby="outreach-heading">
-      <div ref={introRef} className={`feature__intro ${introInView ? 'is-revealed' : ''}`}>
-        <p className="eyebrow">Feature 03 — Outreach Assistant</p>
-        <h2 id="outreach-heading" className="feature__title">
-          Draft the first email
-        </h2>
-        <p className="feature__lede">
-          <strong>Optional</strong> — but it’s the piece that ties the other two
-          together. Pick a program, from the full list or from your results above.
-          Tell it a little about yourself, add a clip if you’ve got one, and it
-          drafts a first email you can edit before you send it. It only writes from
-          what you give it — it won’t guess a coach’s name, an email, or a date.
-        </p>
-      </div>
+    <section className="feature feature--light" id="outreach" aria-labelledby="outreach-heading">
+      <div className="feature__inner">
+        <div ref={introRef} className={`feature__intro ${introInView ? 'is-revealed' : ''}`}>
+          <p className="eyebrow">Feature 03 — Outreach Assistant</p>
+          <h2 id="outreach-heading" className="feature__title">
+            Draft the first email
+          </h2>
+          <p className="feature__lede">
+            <strong>Optional</strong> — but it’s the piece that ties the other two
+            together. Pick a program, from the full list or from your results above.
+            Tell it a little about yourself, add a clip if you’ve got one, and it
+            drafts a first email you can edit before you send it. It only writes from
+            what you give it — it won’t guess a coach’s name, an email, or a date.
+          </p>
+        </div>
 
-      <div className="outreach">
-        <OutreachForm comparables={comparables} clips={clips} />
+        <div className="outreach">
+          <OutreachForm comparables={comparables} clips={clips} />
+        </div>
       </div>
     </section>
   )

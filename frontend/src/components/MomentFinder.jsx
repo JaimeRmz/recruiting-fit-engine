@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { submitMoments, getMomentStatus, clipUrl } from '../api.js'
 import { useInView } from '../hooks/useInView.js'
 import JerseyBadge from './JerseyBadge.jsx'
+import bgPhoto from '../photos/2.jpg'
 
 const POLL_INTERVAL_MS = 4000
 
@@ -103,7 +104,11 @@ export default function MomentFinder({ onClips = () => {} }) {
   }
 
   return (
-    <section className="feature" id="moment-finder" aria-labelledby="moments-heading">
+    <section className="feature feature--photo" id="moment-finder" aria-labelledby="moments-heading">
+      <div className="feature__bg" aria-hidden="true">
+        <img src={bgPhoto} alt="" />
+      </div>
+      <div className="feature__inner">
       <div ref={introRef} className={`feature__intro ${introInView ? 'is-revealed' : ''}`}>
         <p className="eyebrow">Feature 02 — Moment-Finder</p>
         <h2 id="moments-heading" className="feature__title">
@@ -189,6 +194,7 @@ export default function MomentFinder({ onClips = () => {} }) {
         )}
 
         {status === 'done' && data && <MomentResults data={data} />}
+      </div>
       </div>
     </section>
   )

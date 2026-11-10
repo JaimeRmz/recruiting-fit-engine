@@ -1,17 +1,23 @@
 :root {
-  --pitch-charcoal: #1c2420;
+  --pitch-charcoal: #111111;
+  --true-black: #000000;
   --chalk-white: #f3f1ea;
   --turf-green: #3d5a45;
-  /* Brighter "under the lights" cone-orange (was #e2622a). RGB channels are kept
-     as a separate token so every translucent accent references the same source. */
-  --cone-orange: #f4713a;
-  --cone-orange-rgb: 244, 113, 58;
+  --light-section: #f5f5f5;
+  /* TechFootball's exact brand red (was #f4713a, itself once #e2622a). RGB
+     channels are kept as a separate token so every translucent accent
+     references the same source. */
+  --cone-orange: #e10600;
+  --cone-orange-rgb: 225, 6, 0;
+  --cone-orange-hover: #c10500;
   --overcast-grey: #8b9490;
 
-  /* derived */
-  --turf-green-dim: #33493b;
-  --turf-line: #4a6a53;
-  --charcoal-raised: #232d28;
+  /* derived -- neutral black/grey steps off --pitch-charcoal, same desaturated
+     treatment as the --light-section / --pitch-charcoal retirement of the old
+     green family (was #33493b/#4a6a53/#232d28, all green-tinted). */
+  --turf-green-dim: #2a2a2a;
+  --turf-line: #404040;
+  --charcoal-raised: #1e1e1e;
 
   /* Fine, desaturated fabric/turf grain (feTurbulence). Layered under surfaces at
      ~4.5% so it reads as texture, never as visible static. Static image, no motion. */
@@ -19,17 +25,42 @@
 
   /* Glass-edge lighting for cards: a 1px inner highlight along the top (catching
      the light) plus a soft outer lift, replacing hard borders. Shadows only --
-     no backdrop-filter blur. */
+     no backdrop-filter blur. -hover is the same treatment, pushed further for
+     the hover-lift state. */
   --glass-edge: inset 0 1px 0 rgba(243, 241, 234, 0.09),
     0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 28px rgba(0, 0, 0, 0.2);
+  --glass-edge-hover: inset 0 1px 0 rgba(243, 241, 234, 0.09),
+    0 4px 10px rgba(0, 0, 0, 0.34), 0 22px 44px rgba(0, 0, 0, 0.3);
   --glass-border: 1px solid rgba(243, 241, 234, 0.06);
 
-  --font-display: 'Big Shoulders Display', 'Inter', sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Pure system-ui stack -- no custom font files loaded. Identity is carried
+     by font-weight and letter-spacing (see the headline/label/body-copy
+     rules throughout this file), not by typeface choice. One token used
+     everywhere; there is no separate display/body/mono face anymore. */
+  --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Protected text/border color for use on top of a solid --cone-orange fill
+     (active jersey badge, selected pill/segmented option) or a deliberately
+     fixed-dark surface (the outreach draft textarea) -- NEVER overridden by
+     .feature--light, since those pairings need to stay legible regardless of
+     which section theme they're sitting inside. Same value --chalk-white
+     currently holds; kept as its own literal so it can't drift when
+     --chalk-white is reassigned inside a light section. */
+  --fixed-light: #f3f1ea;
 
   --radius: 10px;
   --maxw: 1080px;
+  --header-height: 132px;
+
+  /* Motion system, shared across entrances, hovers, and staggers. */
+  --ease-out: cubic-bezier(0, 0, 0.58, 1);
+  /* Reserved for big, deliberate one-off reveals (the hero headline) -- not a
+     general-purpose easing. */
+  --ease-signature: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --reveal-duration: 0.8s;
+  --interaction-duration: 0.3s;
+  --stagger-step: 150ms;
 }
 
 * {
@@ -38,6 +69,9 @@
 
 html {
   scroll-behavior: smooth;
+  /* Anchor jumps (#comparator etc.) land below the sticky header with real
+     breathing room, not flush against its bottom edge. */
+  scroll-padding-top: calc(var(--header-height) + 2rem);
 }
 
 body {
@@ -45,15 +79,18 @@ body {
   background-color: var(--pitch-charcoal);
   background-image: var(--noise);
   color: var(--chalk-white);
-  font-family: var(--font-body);
+  font-family: var(--font-system);
+  font-weight: 400;
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
+/* No monospace face anymore -- this is now purely a numeric-alignment aid
+   (tabular-nums), not a typeface switch. Kept on the same elements it always
+   was (counts, timestamps, tags) since removing it there would be a no-op. */
 .mono {
-  font-family: var(--font-mono);
-  font-variant-ligatures: none;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Global focus: always visible, cone-orange, never removed. */
@@ -71,12 +108,200 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Hover-ring flourish: a thin cone-orange ring that grows out from an
+   element's own edge on hover -- most of the "custom cursor" feel for
+   near-zero cost, without an actual cursor-following element. Each target
+   needs its own position: relative (set alongside its other rules). */
+.btn-secondary::after,
+.pill::after,
+.segmented__option::after,
+.badge-button::after,
+.dropzone::after,
+.site-footer__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid var(--cone-orange);
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+  transition: transform 150ms ease-out, opacity 150ms ease-out;
+}
+.btn-secondary:hover::after,
+.pill:hover::after,
+.segmented__option:hover::after,
+.badge-button:hover::after,
+.dropzone:hover::after,
+.site-footer__link:hover::after {
+  opacity: 1;
+  transform: scale(1.5);
+}
+
+/* ------------------------------------------------------------- HEADER */
+/* Persistent site nav. Fixed (not sticky) and out of document flow so it can
+   float transparently over the hero photo with nothing behind it -- the
+   hero itself reserves the matching top padding (see .hero) so its own
+   content never sits behind the bar. Crosses to a solid white bar once
+   .is-scrolled is toggled by the scroll listener in Header.jsx, at the same
+   500ms timing as the reference site. */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background-color 500ms ease, border-color 500ms ease;
+}
+.site-header.is-scrolled {
+  background-color: #ffffff;
+  border-bottom-color: rgba(17, 17, 17, 0.08);
+  box-shadow: 0 2px 16px rgba(17, 17, 17, 0.06);
+}
+.site-header__inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  height: var(--header-height);
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.site-header__brand {
+  display: flex;
+  align-items: center;
+}
+/* Sized to roughly two lines of the nav text next to it, so it reads as a
+   real lockup anchoring the bar rather than a small mark. Logo itself is
+   red-on-transparent art that already reads against both the dark hero
+   photo and the white scrolled bar -- no color swap needed either state. */
+.site-header__logo {
+  display: block;
+  height: 92px;
+  width: auto;
+}
+.site-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.site-header__link {
+  font-family: var(--font-system);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.85rem;
+  color: var(--chalk-white);
+  transition: color 0.16s;
+}
+.site-header__link:hover {
+  color: var(--cone-orange);
+  text-decoration: none;
+}
+.site-header.is-scrolled .site-header__link {
+  color: #111111;
+}
+
+/* Hamburger, hidden on desktop. */
+.site-header__toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.site-header__toggle-bar {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: var(--chalk-white);
+  transition: transform 0.25s ease, opacity 0.25s ease, background-color 500ms ease;
+}
+.site-header.is-scrolled .site-header__toggle-bar {
+  background: #111111;
+}
+.site-header__toggle[aria-expanded='true'] .site-header__toggle-bar:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.site-header__toggle[aria-expanded='true'] .site-header__toggle-bar:nth-child(2) {
+  opacity: 0;
+}
+.site-header__toggle[aria-expanded='true'] .site-header__toggle-bar:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Full-screen mobile nav: fades in 0.3s (--interaction-duration), links
+   slide up from translateY(20px) staggered 100ms apart via inline
+   transition-delay in JSX. */
+.site-header__mobile-nav {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 49;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 2rem 1.5rem;
+  background: var(--true-black);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--interaction-duration) ease;
+}
+.site-header__mobile-nav.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.site-header__mobile-link {
+  font-family: var(--font-system);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 1.3rem;
+  color: var(--chalk-white);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--interaction-duration) var(--ease-out),
+    transform var(--interaction-duration) var(--ease-out);
+}
+.site-header__mobile-nav.is-open .site-header__mobile-link {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (min-width: 769px) {
+  .site-header__mobile-nav {
+    display: none;
+  }
+}
+@media (max-width: 768px) {
+  .site-header__nav {
+    display: none;
+  }
+  .site-header__toggle {
+    display: flex;
+  }
+}
+
 /* ---------------------------------------------------------------- HERO */
 .hero {
   position: relative;
   overflow: hidden;
   border-bottom: 1px solid var(--turf-line);
-  padding: clamp(3rem, 8vw, 7rem) 1.5rem clamp(2.5rem, 6vw, 5rem);
+  /* The header floats over the hero as a fixed, out-of-flow overlay, so the
+     hero itself has to reserve that space -- header height plus its own
+     comfortable clearance -- rather than relying on document flow to push
+     the content down. */
+  padding: calc(var(--header-height) + clamp(1.5rem, 4vw, 3rem)) 1.5rem clamp(3rem, 7vw, 6rem);
 }
 
 /* Stadium floodlight: a soft, large radial wash sitting roughly behind the
@@ -98,6 +323,7 @@ a:hover {
 /* Tactical-whiteboard dot grid, pure CSS. */
 .hero__grid {
   position: absolute;
+  z-index: 1;
   /* Bleed past the hero edges so the cursor-parallax shift never exposes a gap
      (the hero clips the overflow). Parallax transform is applied via JS. */
   inset: -24px;
@@ -154,30 +380,27 @@ a:hover {
   }
 }
 
-/* Ambient photo treatment on the hero's right. Right-aligned to the content
-   column, masked so every edge fades into the pitch-charcoal rather than showing a
-   hard rectangle, and darkened/desaturated so it reads as part of the dark palette
-   behind the text. Sits below all text (z-index) and is hidden on narrow viewports. */
+/* Full-bleed photo behind the entire hero, not a boxed inset beside the copy.
+   Sits below the text and the dot-grid (z-index) and below its own dark
+   gradient overlay, which is what keeps the headline/thesis legible on top
+   of whatever crossfades through underneath. */
 .hero__photos {
   position: absolute;
-  z-index: 1;
-  top: clamp(3rem, 8vw, 6.5rem);
-  /* Align the right edge to the centered content column; fall back to the hero
-     padding when the viewport is narrower than the column. */
-  right: max(1.5rem, calc(50% - var(--maxw) / 2));
-  width: min(38vw, 430px);
-  height: clamp(340px, 50vh, 540px);
+  z-index: 0;
+  inset: 0;
   pointer-events: none;
-  /* Feather all four edges: strong fade on the left toward the text, gentle on the
-     right, soft top/bottom. Intersect of a horizontal and a vertical gradient. */
-  -webkit-mask-image:
-    linear-gradient(to right, transparent 0%, #000 42%, #000 88%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
-  mask-image:
-    linear-gradient(to right, transparent 0%, #000 42%, #000 88%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
+}
+/* Gradient overlay: near-solid pitch-charcoal on the left where the copy
+   sits, easing to a lighter (but still dark) wash on the right so the photo
+   itself remains visible rather than fully obscured. A flat darkening pass
+   sits underneath it so even the lightest point stays legible. */
+.hero__photos::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(17, 17, 17, 0.96) 0%, rgba(17, 17, 17, 0.86) 42%, rgba(17, 17, 17, 0.55) 100%),
+    linear-gradient(rgba(17, 17, 17, 0.35), rgba(17, 17, 17, 0.35));
 }
 
 .hero__photo {
@@ -200,13 +423,6 @@ a:hover {
   25% { opacity: 1; }
   31% { opacity: 0; }
   100% { opacity: 0; }
-}
-
-/* Hide on tablet/mobile rather than reflowing into a cramped layout. */
-@media (max-width: 1023px) {
-  .hero__photos {
-    display: none;
-  }
 }
 
 .hero__content {
@@ -237,24 +453,20 @@ a:hover {
   }
 }
 
-.hero__kicker {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.28em;
-  font-size: 0.72rem;
-  color: var(--cone-orange);
-  margin: 0 0 1.25rem;
-}
-
 .hero__title {
-  font-family: var(--font-display);
-  font-weight: 800;
+  font-family: var(--font-system);
+  /* Identity now comes from weight + tracking, not typeface: font-black and
+     tight negative tracking on the big uppercase headlines. */
+  font-weight: 900;
   font-size: clamp(2.4rem, 6.5vw, 4.75rem);
   line-height: 0.98;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.035em;
   text-transform: uppercase;
   margin: 0 0 1.5rem;
   max-width: 16ch;
+  /* The one "big deliberate moment" on the page -- overrides the shared
+     hero-rise easing from .hero__content > * with the signature curve. */
+  animation-timing-function: var(--ease-signature);
 }
 
 .hero__thesis {
@@ -275,74 +487,226 @@ a:hover {
   margin: 0 0 2rem;
 }
 
-.hero__nav {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+/* ------------------------------------------------------------- STATS */
+/* Full-bleed "Performance Metrics" band, echoing TechFootball's stat-block
+   treatment (big red numbers, thin red schematic connectors, dark
+   grid-texture background) but built on RFE's own real numbers. Sits
+   outside .page's max-width column on purpose -- a full-bleed dark band
+   between the hero and the first feature, not another card in the column. */
+.stats {
+  background-color: var(--charcoal-raised);
+  border-top: 1px solid var(--turf-line);
+  border-bottom: 1px solid var(--turf-line);
+  padding: clamp(3.25rem, 7vw, 5.5rem) 1.5rem;
+  /* Fine 1px grid-line texture, distinct from the hero's dot-grid and the
+     turf noise used elsewhere -- this section's own technical texture. */
+  background-image:
+    linear-gradient(to right, rgba(243, 241, 234, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(243, 241, 234, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
-.hero__link {
-  font-family: var(--font-display);
-  font-weight: 600;
+.stats__inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  text-align: center;
+}
+.stats__heading {
+  position: relative;
+  font-family: var(--font-system);
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 1rem;
-  padding: 0.55rem 1.4rem;
-  border: 1px solid var(--turf-line);
-  border-radius: 999px;
-  color: var(--chalk-white);
-  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s, transform 0.16s;
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  letter-spacing: -0.035em;
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.9rem;
 }
-.hero__link:hover {
-  text-decoration: none;
-  border-color: var(--cone-orange);
-  background: rgba(var(--cone-orange-rgb), 0.1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(var(--cone-orange-rgb), 0.16);
+.stats__heading::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 3px;
+  background: var(--cone-orange);
+}
+.stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 1rem;
+}
+.stat:not(:first-child) {
+  border-left: 1px dashed var(--turf-line);
+}
+/* Small schematic marker -- a dot with a thin connector line dropping down
+   to the number, echoing the reference site's annotation-style stat labels. */
+.stat__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cone-orange);
+  margin-bottom: 10px;
+  position: relative;
+}
+.stat__dot::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 16px;
+  background: var(--cone-orange);
+  opacity: 0.5;
+}
+.stat__number {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  /* Big stat number -- same weight as the headlines, matching TechFootball's
+     stat-number treatment. .mono (already applied in JSX) adds tabular-nums
+     for alignment now that there's no monospace face to lean on. */
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--cone-orange);
+  margin: 0;
+  line-height: 1;
+}
+.stat__label {
+  font-family: var(--font-system);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  color: var(--overcast-grey);
+  margin: 0.6rem 0 0;
+}
+@media (max-width: 640px) {
+  .stats__grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .stat:not(:first-child) {
+    border-left: 0;
+    border-top: 1px dashed var(--turf-line);
+    padding-top: 1.5rem;
+  }
 }
 
 /* ---------------------------------------------------------------- PAGE */
-.page {
+/* Each feature is now its own full-bleed band (like .stats/.site-footer)
+   rather than a shared padded column -- that's what makes the light/dark
+   section rhythm possible. .feature carries the band's padding + background;
+   .feature__inner is the max-width content column that used to be .feature
+   itself. The color change between adjacent bands is the divider now, so
+   there's no more .section-divider element between them. */
+.feature {
+  padding: clamp(3.5rem, 8vw, 7rem) 1.5rem;
+}
+.feature__inner {
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: clamp(2.5rem, 6vw, 5rem) 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(2.5rem, 6vw, 5rem);
-}
-
-.section-divider {
-  height: 1px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--turf-line) 0,
-    var(--turf-line) 12px,
-    transparent 12px,
-    transparent 24px
-  );
-}
-
-.feature {
   display: grid;
-  gap: 2rem;
+  gap: 2.75rem;
+}
+
+/* Moment-Finder only: the one dark feature band with no photo/texture of its
+   own (Stats already has its grid-line texture; the light features have the
+   white/light-section layering). A very dark, low-opacity grayscale photo
+   keeps this band from reading as flat color, echoing the hero without
+   competing with the form/results on top of it. */
+.feature--photo {
+  position: relative;
+  overflow: hidden;
+}
+.feature__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.feature__bg img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1) brightness(0.35) contrast(1.05);
+  opacity: 0.5;
+}
+.feature__bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 17, 17, 0.85);
+}
+.feature--photo .feature__inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* Feature 01 (Comparator) and Feature 03 (Outreach) flip to light; Feature 02
+   (Moment-Finder) has no modifier and stays on the page's own dark background,
+   unchanged. Every component inside a feature reads its text/border/surface
+   colors from these tokens already, so re-defining them here -- rather than
+   re-styling each component -- is what makes the flip complete instead of
+   partial. --fixed-light is deliberately NOT touched here: it's for
+   text/borders painted on a solid --cone-orange fill or another fixed-dark
+   surface (active jersey badge, selected pill, the outreach draft textarea),
+   which need to stay legible no matter which section theme surrounds them. */
+/* True white (#fff) is the section band itself -- --light-section (#f5f5f5)
+   is kept as a distinct, secondary tone for surfaces that sit ON TOP of that
+   white (the form card, result rows), so the section reads as white-with-
+   grey-cards layered on it, not one flat grey field throughout. */
+.feature--light {
+  background-color: #fff;
+  --chalk-white: #111111;
+  --overcast-grey: #666666;
+  --charcoal-raised: var(--light-section);
+  /* #d6d6d6 measured 1.33-1.45:1 against these backgrounds -- fails WCAG's
+     3:1 non-text contrast minimum for UI component boundaries (inputs,
+     pills, dashed placeholders). #828282 measures 3.52-3.84:1, see the
+     conversation notes for the full pairing audit. */
+  --turf-line: #828282;
+  --turf-green-dim: var(--light-section);
+  color: var(--chalk-white);
 }
 
 .eyebrow {
-  font-family: var(--font-mono);
+  font-family: var(--font-system);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
   font-size: 0.72rem;
   color: var(--overcast-grey);
   margin: 0 0 0.75rem;
 }
 
 .feature__title {
-  font-family: var(--font-display);
-  font-weight: 700;
+  position: relative;
+  font-family: var(--font-system);
+  font-weight: 900;
   text-transform: uppercase;
   font-size: clamp(1.9rem, 4vw, 3rem);
   line-height: 1;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.035em;
   margin: 0 0 1rem;
+  /* Room for the red hairline underline below, echoing TechFootball's
+     heading treatment -- .feature__intro already carries the vertical
+     accent bar on the left, this adds the horizontal one. */
+  padding-bottom: 0.9rem;
+}
+.feature__title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 56px;
+  height: 3px;
+  background: var(--cone-orange);
 }
 
 .feature__lede {
@@ -355,8 +719,9 @@ a:hover {
   padding-left: 1.25rem;
   /* Scroll-reveal: hidden until IntersectionObserver adds .is-revealed (once). */
   opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translateY(30px);
+  transition: opacity var(--reveal-duration) var(--ease-out),
+    transform var(--reveal-duration) var(--ease-out);
 }
 .feature__intro.is-revealed {
   opacity: 1;
@@ -368,12 +733,15 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 800;
-  background: var(--turf-green);
-  color: var(--chalk-white);
-  border: 2px solid var(--chalk-white);
-  box-shadow: inset 0 0 0 2px var(--turf-green), 0 2px 6px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-system);
+  /* Same font-black treatment as the rest of the system for consistency --
+     verified via screenshot at both badge sizes (44px/60px): still reads
+     cleanly for GK/D/M/F at this weight, see conversation notes. */
+  font-weight: 900;
+  background: var(--light-section);
+  color: var(--pitch-charcoal);
+  border: 2px solid var(--pitch-charcoal);
+  box-shadow: inset 0 0 0 2px var(--light-section), 0 2px 6px rgba(0, 0, 0, 0.35);
   border-radius: 50%;
   line-height: 1;
   flex-shrink: 0;
@@ -394,7 +762,10 @@ a:hover {
 }
 .jersey-badge.is-active {
   background: var(--cone-orange);
-  border-color: var(--chalk-white);
+  /* Fixed, not --chalk-white -- this text/border sits on a solid cone-orange
+     fill regardless of section theme, so it must stay light either way. */
+  color: var(--fixed-light);
+  border-color: var(--fixed-light);
   box-shadow: inset 0 0 0 2px var(--cone-orange), 0 3px 10px rgba(var(--cone-orange-rgb), 0.45);
 }
 
@@ -409,6 +780,12 @@ a:hover {
   box-shadow: var(--glass-edge);
   border-radius: var(--radius);
   padding: clamp(1.25rem, 3vw, 2rem);
+  transition: transform var(--interaction-duration) ease, box-shadow var(--interaction-duration) ease;
+}
+.comparator-form:hover,
+.moments-form:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--glass-edge-hover);
 }
 
 .field {
@@ -419,11 +796,11 @@ a:hover {
 }
 .field__label {
   display: block;
-  font-family: var(--font-body);
-  font-weight: 600;
+  font-family: var(--font-system);
+  font-weight: 700;
   font-size: 0.82rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   color: var(--chalk-white);
   margin-bottom: 0.75rem;
   padding: 0;
@@ -442,14 +819,16 @@ a:hover {
   position: relative;
 }
 .badge-button {
+  position: relative;
   background: transparent;
   border: 0;
   padding: 4px;
   border-radius: 50%;
   cursor: pointer;
-  /* Spring easing so a press releases with a small overshoot, not a linear snap.
-     Glow uses drop-shadow (follows the circle) so it never fights the selected ring. */
-  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.16s ease;
+  /* Quick-snap-with-overshoot so a press releases with a small bounce, not a
+     linear snap. Glow uses drop-shadow (follows the circle) so it never fights
+     the selected ring. */
+  transition: transform 150ms var(--ease-snap), filter 0.16s ease;
 }
 .badge-button:hover {
   transform: translateY(-2px);
@@ -499,12 +878,15 @@ a:hover {
   overflow: hidden;
 }
 .segmented__option {
+  position: relative;
   background: transparent;
   color: var(--chalk-white);
   border: 0;
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-family: var(--font-system);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.85rem;
   padding: 0.7rem 1.6rem;
   cursor: pointer;
   transition: background 0.15s;
@@ -514,13 +896,15 @@ a:hover {
 }
 .segmented__option.is-selected {
   background: var(--cone-orange);
-  color: var(--chalk-white);
+  /* Fixed -- always light text on the solid cone-orange fill, regardless of
+     section theme (see --fixed-light's definition in :root). */
+  color: var(--fixed-light);
 }
 
 .select {
   width: 100%;
   max-width: 340px;
-  font-family: var(--font-body);
+  font-family: var(--font-system);
   font-size: 1rem;
   color: var(--chalk-white);
   background: var(--charcoal-raised);
@@ -541,8 +925,12 @@ a:hover {
   flex-wrap: wrap;
 }
 .pill {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  position: relative;
+  font-family: var(--font-system);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.8rem;
   color: var(--chalk-white);
   background: var(--charcoal-raised);
   border: 1px solid var(--turf-line);
@@ -559,15 +947,18 @@ a:hover {
 .pill.is-selected {
   background: var(--cone-orange);
   border-color: var(--cone-orange);
-  color: var(--chalk-white);
+  /* Fixed -- see --fixed-light's definition in :root. */
+  color: var(--fixed-light);
 }
 
 .cta {
+  position: relative;
+  overflow: hidden;
   justify-self: start;
-  font-family: var(--font-display);
+  font-family: var(--font-system);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.12em;
   font-size: 1.1rem;
   color: var(--pitch-charcoal);
   background: var(--cone-orange);
@@ -575,10 +966,27 @@ a:hover {
   border-radius: var(--radius);
   padding: 0.85rem 2rem;
   cursor: pointer;
-  transition: filter 0.15s, transform 0.12s;
+  transition: transform 0.12s;
+}
+/* Fill-on-hover: a darker overlay slides in from the left, clipped to the
+   button's own box (overflow: hidden above) and kept behind the label text
+   (negative z-index, painted before in-flow inline content in the button's
+   own stacking context). */
+.cta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: var(--cone-orange-hover);
+  z-index: -1;
+  transition: left 0.4s ease;
+}
+.cta:hover:not(:disabled)::before {
+  left: 0;
 }
 .cta:hover:not(:disabled) {
-  filter: brightness(1.08);
   transform: translateY(-1px);
 }
 .cta:disabled {
@@ -596,10 +1004,10 @@ a:hover {
   text-align: center;
 }
 .placeholder__title {
-  font-family: var(--font-display);
-  font-weight: 600;
+  font-family: var(--font-system);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.12em;
   font-size: 1.15rem;
   margin: 0 0 0.4rem;
 }
@@ -618,11 +1026,11 @@ a:hover {
   margin: 0.35rem 0 0;
 }
 .notice__tag {
-  font-family: var(--font-mono);
+  font-family: var(--font-system);
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-weight: 700;
 }
 .notice--regional {
   background: rgba(var(--cone-orange-rgb), 0.12);
@@ -678,8 +1086,9 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background-color: var(--turf-green);
+  background-color: var(--light-section);
   background-image: var(--noise);
+  color: var(--pitch-charcoal);
   border: var(--glass-border);
   box-shadow: var(--glass-edge);
   border-radius: var(--radius);
@@ -687,6 +1096,11 @@ a:hover {
   /* Each row fades and rises in; the per-row delay is set inline (staggered for
      the first ~10, then revealed together). */
   animation: card-rise 0.3s ease-out both;
+  transition: transform var(--interaction-duration) ease, box-shadow var(--interaction-duration) ease;
+}
+.player-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--glass-edge-hover);
 }
 @keyframes card-rise {
   from {
@@ -708,7 +1122,7 @@ a:hover {
   margin: 0;
 }
 .player-card__hometown {
-  color: var(--chalk-white);
+  color: var(--pitch-charcoal);
   opacity: 0.75;
   font-size: 0.85rem;
   margin: 0.15rem 0 0;
@@ -719,7 +1133,10 @@ a:hover {
   flex-shrink: 0;
 }
 .tag {
-  font-family: var(--font-mono);
+  font-family: var(--font-system);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   font-size: 0.72rem;
   padding: 0.28rem 0.6rem;
   border-radius: 5px;
@@ -744,6 +1161,11 @@ a:hover {
   border: var(--glass-border);
   box-shadow: var(--glass-edge);
   border-radius: var(--radius);
+  transition: transform var(--interaction-duration) ease, box-shadow var(--interaction-duration) ease;
+}
+.outreach:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--glass-edge-hover);
 }
 /* Empty-state jump-back link to the Comparator. */
 .outreach-empty__cta {
@@ -783,7 +1205,7 @@ a:hover {
 .textarea {
   width: 100%;
   max-width: 100%;
-  font-family: var(--font-body);
+  font-family: var(--font-system);
   font-size: 1rem;
   color: var(--chalk-white);
   background: var(--charcoal-raised);
@@ -834,10 +1256,13 @@ a:hover {
 }
 .outreach-draft {
   width: 100%;
-  font-family: var(--font-body);
+  font-family: var(--font-system);
   font-size: 0.98rem;
   line-height: 1.55;
-  color: var(--chalk-white);
+  /* Fixed -- this textarea keeps a deliberately dark background regardless of
+     the surrounding section theme, so its text must stay fixed-light too
+     (see --fixed-light's definition in :root), not flip with --chalk-white. */
+  color: var(--fixed-light);
   background: var(--pitch-charcoal);
   border: 1px solid var(--turf-line);
   border-radius: var(--radius);
@@ -854,10 +1279,11 @@ a:hover {
 }
 /* Quieter than the cone-orange .cta -- an outline button for a utility action. */
 .btn-secondary {
-  font-family: var(--font-display);
-  font-weight: 600;
+  position: relative;
+  font-family: var(--font-system);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   font-size: 0.95rem;
   color: var(--chalk-white);
   background: transparent;
@@ -889,7 +1315,7 @@ a:hover {
   font-size: 0.95rem;
 }
 .constraint__icon {
-  font-family: var(--font-display);
+  font-family: var(--font-system);
   font-weight: 800;
   color: var(--cone-orange);
   font-size: 1.3rem;
@@ -932,10 +1358,10 @@ a:hover {
   gap: 0.35rem;
 }
 .dropzone__cta {
-  font-family: var(--font-display);
-  font-weight: 600;
+  font-family: var(--font-system);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   font-size: 1.15rem;
   color: var(--cone-orange);
 }
@@ -991,10 +1417,10 @@ a:hover {
   }
 }
 .analyzing__title {
-  font-family: var(--font-display);
-  font-weight: 600;
+  font-family: var(--font-system);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.12em;
   font-size: 1.3rem;
   margin: 0 0 0.5rem;
 }
@@ -1006,7 +1432,7 @@ a:hover {
 
 /* The honesty panel — deliberately loud, never collapsed. */
 .honesty {
-  background: var(--turf-green);
+  background: var(--light-section);
   border: 1px solid var(--cone-orange);
   border-top: 4px solid var(--cone-orange);
   border-radius: var(--radius);
@@ -1014,13 +1440,13 @@ a:hover {
   margin-bottom: 1.75rem;
 }
 .honesty__heading {
-  font-family: var(--font-display);
+  font-family: var(--font-system);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.12em;
   font-size: 1.15rem;
   margin: 0 0 0.9rem;
-  color: var(--chalk-white);
+  color: var(--pitch-charcoal);
 }
 .honesty__list {
   margin: 0;
@@ -1029,7 +1455,7 @@ a:hover {
   gap: 0.6rem;
 }
 .honesty__list li {
-  color: var(--chalk-white);
+  color: var(--pitch-charcoal);
   font-size: 0.95rem;
 }
 .honesty__list li::marker {
@@ -1048,12 +1474,18 @@ a:hover {
   gap: 1.25rem;
 }
 .moment-card {
-  background-color: var(--turf-green);
+  background-color: var(--light-section);
   background-image: var(--noise);
+  color: var(--pitch-charcoal);
   border: var(--glass-border);
   box-shadow: var(--glass-edge);
   border-radius: var(--radius);
   padding: 1rem;
+  transition: transform var(--interaction-duration) ease, box-shadow var(--interaction-duration) ease;
+}
+.moment-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--glass-edge-hover);
 }
 .moment-card__head {
   display: flex;
@@ -1063,27 +1495,33 @@ a:hover {
   flex-wrap: wrap;
 }
 .moment-card__rank {
-  color: var(--overcast-grey);
+  color: var(--pitch-charcoal);
+  opacity: 0.6;
   font-size: 0.9rem;
 }
 .moment-card__time {
   font-size: 1.35rem;
-  font-weight: 600;
-  color: var(--chalk-white);
+  /* Smaller inline data value -- regular weight, not the big-stat 900.
+     .mono (already applied in JSX) adds tabular-nums for alignment. */
+  font-weight: 400;
+  color: var(--pitch-charcoal);
 }
 .signal {
-  font-family: var(--font-mono);
+  font-family: var(--font-system);
+  font-weight: 700;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   padding: 0.3rem 0.65rem;
   border-radius: 5px;
   border: 1px solid var(--turf-line);
-  color: var(--overcast-grey);
+  color: var(--pitch-charcoal);
+  opacity: 0.6;
 }
 .signal--both {
   color: var(--cone-orange);
   border-color: var(--cone-orange);
+  opacity: 1;
 }
 .moment-card__video {
   width: 100%;
@@ -1106,14 +1544,16 @@ a:hover {
   background-color: var(--charcoal-raised);
 }
 .moment-card__noclip {
-  color: var(--overcast-grey);
+  color: var(--pitch-charcoal);
+  opacity: 0.6;
   margin: 0;
 }
 
 /* ------------------------------------------------------------- FOOTER */
 .site-footer {
+  background: var(--true-black);
   border-top: 1px solid var(--turf-line);
-  padding: 2rem 1.5rem;
+  padding: 3rem 1.5rem;
   text-align: center;
 }
 .site-footer__rule {
@@ -1132,6 +1572,7 @@ a:hover {
 }
 /* Quiet credit-style link -- muted by default, not a bright CTA. */
 .site-footer__link {
+  position: relative;
   display: inline-block;
   margin-top: 0.9rem;
   font-size: 0.78rem;
@@ -1141,6 +1582,20 @@ a:hover {
 .site-footer__link:hover {
   color: var(--chalk-white);
   text-decoration: none;
+}
+.site-footer__credit {
+  margin-left: 1rem;
+  vertical-align: middle;
+}
+.site-footer__logo {
+  display: block;
+  height: 22px;
+  width: auto;
+  opacity: 0.65;
+  transition: opacity 0.16s;
+}
+.site-footer__credit:hover .site-footer__logo {
+  opacity: 1;
 }
 
 /* ------------------------------------------------------------- RESPONSIVE */
@@ -1179,7 +1634,12 @@ a:hover {
 
 /* ------------------------------------------------- REDUCED MOTION */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  /* ::before/::after are not matched by a bare `*` -- spell them out so the
+     CTA fill-on-hover and the hover-ring flourish collapse to an instant
+     state too, same as every real element below. */
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     /* Reset delays too, or staggered/entrance items would sit hidden through
        their delay and then pop in sequentially -- worse than no animation. */
@@ -1204,8 +1664,12 @@ a:hover {
   .badge-button:hover,
   .badge-button:active,
   .cta:hover:not(:disabled),
-  .hero__link:hover,
-  .pill:hover {
+  .pill:hover,
+  .comparator-form:hover,
+  .moments-form:hover,
+  .outreach:hover,
+  .player-card:hover,
+  .moment-card:hover {
     transform: none;
   }
   /* Cursor parallax is JS-driven and not attached under reduced motion, but lock
